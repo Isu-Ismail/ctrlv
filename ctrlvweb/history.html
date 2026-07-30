@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ctrlv - Sent Text History</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="scrollable">
+
+  <div class="container">
+    <!-- Top Header Navigation -->
+    <header>
+      <div class="brand">
+        <a href="index.html" class="brand-logo" title="Return to Dashboard"><i class="fa-solid fa-bolt"></i></a>
+        <div style="display: flex; flex-direction: column;">
+          <div class="brand-title">Sent Text History</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
+            Room: <span class="active-room-id" id="activeRoomBadge" style="color: var(--accent-primary); font-weight: 700;">room-alpha-123</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <button class="btn-tool" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" id="btnClearAllHistory">
+          <i class="fa-solid fa-trash-can"></i> Clear All
+        </button>
+        <a href="index.html" class="btn-create-room" style="text-decoration: none;">
+          <i class="fa-solid fa-arrow-left"></i> Back to Sync
+        </a>
+      </div>
+    </header>
+
+    <!-- Master-Detail 2-Column Sidebar Layout -->
+    <div class="history-layout">
+      <!-- Left Sidebar (Item Snippets List) -->
+      <div class="history-sidebar" id="historySidebar">
+        <!-- Dynamically populated by history.js -->
+      </div>
+
+      <!-- Right Detail Panel (Full Text Box & Copy Actions) -->
+      <div class="history-detail-panel" id="historyDetailPanel">
+        <!-- Dynamically populated by history.js -->
+      </div>
+    </div>
+
+    <footer>
+      ctrlv &bull; Real-time cross-device sync
+    </footer>
+  </div>
+
+  <!-- JavaScript Module -->
+  <script type="module" src="history.js"></script>
+</body>
+</html>

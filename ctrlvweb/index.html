@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ctrlv - Realtime Sync Dashboard</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <div class="container">
+    <!-- Unified Compact Top Control Card -->
+    <div class="top-panel-card">
+      <!-- Row 1: Brand & Room Connections -->
+      <div class="top-panel-row">
+        <div class="brand">
+          <a href="index.html" class="brand-logo" title="ctrlv Realtime Sync"><i class="fa-solid fa-bolt"></i></a>
+          <div class="brand-title">ctrlv</div>
+          <div id="connStatusBadge" class="conn-status-badge offline">
+            <i class="fa-solid fa-signal"></i> <span id="connStatusText">Disconnected</span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <div class="room-selector">
+            <i class="fa-solid fa-door-open" style="color: var(--text-muted);"></i>
+            <span style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">Room:</span>
+            <input type="text" id="roomIdInput" placeholder="Enter Room ID" value="room-alpha-123">
+          </div>
+
+          <button class="btn-create-room" id="btnConnect">
+            <i class="fa-solid fa-plug"></i> <span id="btnConnectText">Connect</span>
+          </button>
+
+          <button class="btn-tool" id="btnCopyRoom">
+            <i class="fa-regular fa-copy"></i> <span id="copyBtnText">Copy CLI Command</span>
+          </button>
+
+          <a href="config.html" class="btn-tool" style="text-decoration: none;" title="Configure Firebase & AI Settings">
+            <i class="fa-solid fa-gear"></i> Config
+          </a>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="top-panel-divider"></div>
+
+      <!-- Row 2: Prompt Bar & AI Controls -->
+      <div class="top-panel-row">
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 280px;">
+          <label for="aiInstructionInput" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">
+            <i class="fa-solid fa-terminal" style="color: var(--accent-primary);"></i> Prompt:
+          </label>
+          <input type="text" id="aiInstructionInput" class="config-input" style="padding: 0.35rem 0.65rem; font-size: 0.82rem;" placeholder="Instructions for AI Solver..." value="Solve the problem shown in this screenshot or text. Output ONLY clean, working code without explanations or markdown formatting.">
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <span id="aiSolverStatusBadge" class="status-pill pending" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">
+            <i class="fa-solid fa-robot"></i> <span id="aiSolverStatusText">AI Ready</span>
+          </span>
+
+          <button class="btn-tool" id="btnToggleAutoSolve" title="Automatically solve new screenshots/text questions on arrival">
+            <i class="fa-solid fa-bolt"></i> <span id="autoSolveLabel">Auto-Solve: ON</span>
+          </button>
+
+          <button class="btn-send" id="btnSolveGemini" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
+            <i class="fa-solid fa-brain"></i> Solve Current
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+      <!-- Left Panel: Tabbed Screenshot / PC Question Text Container -->
+      <div class="card">
+        <div class="card-header">
+          <!-- Header Tabs -->
+          <div class="tab-group">
+            <button class="tab-btn active" id="tabBtnScreenshot">
+              <i class="fa-solid fa-image"></i> Screenshot
+            </button>
+            <button class="tab-btn" id="tabBtnPCText">
+              <i class="fa-solid fa-laptop"></i> PC Text (Ctrl+Shift+T)
+            </button>
+          </div>
+
+          <!-- Actions for Screenshot Tab -->
+          <div class="card-actions" id="screenshotActions">
+            <button class="btn-tool" id="btnFetchScreenshot" title="Fetch latest screenshot from Firestore (Does not trigger AI)">
+              <i class="fa-solid fa-rotate-right"></i> <span id="fetchImgLabel">Fetch</span>
+            </button>
+            <button class="btn-tool" id="btnToggleAutoDownload" title="Auto-download screenshots when received">
+              <i class="fa-solid fa-cloud-arrow-down"></i> <span id="autoDlLabel">Auto-Save: OFF</span>
+            </button>
+            <button class="btn-tool" id="btnDownloadImg" title="Download current screenshot">
+              <i class="fa-solid fa-download"></i> Save PNG
+            </button>
+          </div>
+
+          <!-- Actions for PC Text Tab -->
+          <div class="card-actions" id="pcTextActions" style="display: none;">
+            <button class="btn-tool" id="btnFetchPCText" title="Fetch latest text question from Firestore (Does not trigger AI)">
+              <i class="fa-solid fa-rotate-right"></i> <span id="fetchTextLabel">Fetch Text</span>
+            </button>
+            <button class="btn-tool" id="btnSolvePCSentText" title="Solve text question with AI">
+              <i class="fa-solid fa-brain"></i> Solve Question
+            </button>
+          </div>
+        </div>
+
+        <!-- Viewport 1: Screenshot Viewer -->
+        <div class="screenshot-viewer" id="screenshotViewer">
+          <div class="empty-state" id="emptyState">
+            <i class="fa-solid fa-camera-retro"></i>
+            <p style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">No Screenshot Received</p>
+            <span class="shortcut-badge">Press Ctrl + Shift + S on PC</span>
+          </div>
+          <img id="screenshotImg" src="" alt="Screenshot" style="display: none;">
+        </div>
+
+        <!-- Viewport 2: PC Question Text Viewer (Hidden by default, shown when PC Text tab is active) -->
+        <div class="pc-text-viewer" id="pcSentTextViewer" style="display: none;">
+          <div id="pcSentTextDisplay" style="color: var(--text-muted);">No question text received yet. Press Ctrl+Shift+T on PC to send clipboard text here.</div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Clean Solution & Clipboard Sync Area -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <i class="fa-solid fa-paper-plane"></i> Text & Clipboard Sync
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <button class="btn-tool" id="btnOpenHistory" title="View Full Text History Page">
+              <i class="fa-solid fa-clock-rotate-left"></i> History Page
+            </button>
+            <div id="statusBadge" class="status-pill pending">
+              <i class="fa-solid fa-clock"></i> <span id="statusText">Pending</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full Vertical Text Area -->
+        <div class="text-area-wrapper">
+          <textarea id="textInput" placeholder="Solution code or text will appear here automatically and copy to PC clipboard..."></textarea>
+          <div class="text-actions">
+            <span class="shortcut-badge"><i class="fa-solid fa-keyboard"></i> Ctrl + Shift + F to copy on PC</span>
+            <button class="btn-send" id="btnSendText">
+              <i class="fa-solid fa-share"></i> <span id="btnSendTextLabel">Send to PC</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Fullscreen Modal -->
+    <div class="modal" id="imageModal">
+      <span class="close-modal" id="btnCloseModal">&times;</span>
+      <img class="modal-content" id="modalImg" alt="Expanded Screenshot">
+    </div>
+
+    <footer>
+      ctrlv &bull; Real-time cross-device sync & AI Vision Assistant
+    </footer>
+  </div>
+
+  <!-- Main JavaScript Module -->
+  <script type="module" src="script.js"></script>
+</body>
+
+</html>
