@@ -1,0 +1,40 @@
+name: Deploy Web to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Commit Message for buildweb
+        id: check_commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Latest Commit Message: ${COMMIT_MSG}"
+          if [[ "${COMMIT_MSG}" == *"buildweb"* ]]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "Commit message does not contain 'buildweb'. Skipping deploy."
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy ctrlvweb to deploy branch
+        if: steps.check_commit.outputs.should_deploy == 'true' || github.event_name == 'workflow_dispatch'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ctrlvweb
+          publish_branch: deploy
+          commit_message: "deploy: publish ctrlvweb to deploy branch [skip ci]"
