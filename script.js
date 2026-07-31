@@ -19,6 +19,7 @@ const clientCountsBadge = document.getElementById("clientCountsBadge");
 const browserCount = document.getElementById("browserCount");
 const pcCount = document.getElementById("pcCount");
 const btnCopyRoom = document.getElementById("btnCopyRoom");
+const btnCopyRoomId = document.getElementById("btnCopyRoomId");
 const btnGenRandomRoom = document.getElementById("btnGenRandomRoom");
 
 // UI Elements: Dashboard Sync
@@ -231,6 +232,13 @@ function updateAISolverStatus(state, msg) {
   }
 }
 
+function resolveAIProvider(provider, apiKey) {
+  if (provider && provider !== "auto") return provider;
+  if (apiKey.startsWith("gsk_")) return "groq";
+  if (apiKey.startsWith("AIza")) return "google";
+  return "openrouter"; // Default to OpenRouter for OpenAI, Claude, DeepSeek, Llama, Qwen, Gemini, etc.
+}
+
 // -----------------------------------------------------------------------------
 // 3. Multi-Provider Vision AI Solver (OpenRouter / Groq / Google AI Studio)
 // -----------------------------------------------------------------------------
@@ -255,7 +263,7 @@ async function solveImageWithGemini(b64ImageData, promptText) {
   }
 
   isSolvingAI = true;
-  const provider = aiConfig.provider || "openrouter";
+  const provider = resolveAIProvider(aiConfig.provider, cleanApiKey);
   updateAISolverStatus("solving", `${provider.toUpperCase()} Analyzing Screenshot...`);
 
   let fullB64Url = b64ImageData;
@@ -404,7 +412,7 @@ async function solveTextWithGemini(questionText, promptText) {
   }
 
   isSolvingAI = true;
-  const provider = aiConfig.provider || "openrouter";
+  const provider = resolveAIProvider(aiConfig.provider, cleanApiKey);
   updateAISolverStatus("solving", `${provider.toUpperCase()} Solving Text Question...`);
 
   const userPrompt = promptText || aiConfig.customPrompt || "Solve the problem shown in this text. Output ONLY clean, working code without explanations or markdown formatting.";
@@ -572,8 +580,8 @@ function connectToRoom(roomId) {
 
   loadAndDisplayCachedScreenshot();
 
-  const relayUrl = "wss://ctrlv.onrender.com/ws";
-  const fullWsUrl = `${relayUrl}?room=${encodeURIComponent(roomId)}&client=browser`;
+  const savedRelayUrl = (localStorage.getItem("ctrlv_relay_url") || "wss://ctrlv.onrender.com/ws").trim();
+  const fullWsUrl = `${savedRelayUrl}?room=${encodeURIComponent(roomId)}&client=browser`;
 
   try {
     ws = new WebSocket(fullWsUrl);
@@ -600,19 +608,20 @@ function connectToRoom(roomId) {
           if (pcCount) pcCount.textContent = msg.clis || 0;
         } else if (msg.type === "image" && msg.content) {
           const newImg = msg.content;
-          if (newImg !== cachedImagePath) {
-            const isFirstLoad = (cachedImagePath === null);
-            cachedImagePath = newImg;
-            screenshotImg.src = newImg;
-            screenshotImg.style.display = "block";
-            emptyState.style.display = "none";
-            saveCachedScreenshot(newImg);
+          const isFreshImage = (newImg !== cachedImagePath);
+          const isFirstLoad = (cachedImagePath === null);
+          
+          cachedImagePath = newImg;
+          screenshotImg.src = newImg;
+          screenshotImg.style.display = "block";
+          if (emptyState) emptyState.style.display = "none";
+          saveCachedScreenshot(newImg);
 
-            if (autoDownload && !isFirstLoad) {
+          if (isFreshImage && !isFirstLoad) {
+            if (autoDownload) {
               downloadImage(newImg, `ctrlv-${currentRoomId}-${Date.now()}.png`);
             }
-
-            if (autoSolveEnabled && !isFirstLoad) {
+            if (autoSolveEnabled) {
               switchTab("screenshot");
               const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
               solveImageWithGemini(newImg, prompt);
@@ -628,8 +637,6 @@ function connectToRoom(roomId) {
               pcSentTextDisplay.textContent = newText;
               pcSentTextDisplay.style.color = "var(--text-main)";
             }
-
-            textInput.value = newText;
 
             if (autoSolveEnabled && !isFirstLoad) {
               switchTab("pctext");
@@ -665,6 +672,28 @@ if (btnGenRandomRoom) {
     if (isConnected) {
       connectToRoom(newRoom);
     }
+    // Auto-copy generated room ID to clipboard
+    navigator.clipboard.writeText(newRoom).then(() => {
+      const originalText = btnGenRandomRoom.innerHTML;
+      btnGenRandomRoom.innerHTML = `<i class="fa-solid fa-check"></i>`;
+      setTimeout(() => {
+        btnGenRandomRoom.innerHTML = originalText;
+      }, 1800);
+    }).catch(e => console.warn("Clipboard access error:", e));
+  });
+}
+
+if (btnCopyRoomId) {
+  btnCopyRoomId.addEventListener("click", () => {
+    const room = roomIdInput ? roomIdInput.value.trim() : "ctrlv-a8f3b2";
+    if (!room) return;
+    navigator.clipboard.writeText(room).then(() => {
+      const originalText = btnCopyRoomId.innerHTML;
+      btnCopyRoomId.innerHTML = `<i class="fa-solid fa-check"></i>`;
+      setTimeout(() => {
+        btnCopyRoomId.innerHTML = originalText;
+      }, 1800);
+    });
   });
 }
 
