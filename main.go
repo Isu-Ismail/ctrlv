@@ -14,7 +14,7 @@ import (
 // Message payload structure
 type Message struct {
 	Type     string `json:"type"`               // "text", "image", or "room_stats"
-	RoomID   string `json:"room_id"`             // e.g. "room-alpha-123"
+	RoomID   string `json:"room_id"`             // e.g. "ctrlv-a8f3b2"
 	Content  string `json:"content,omitempty"`  // Text snippet or base64 image string
 	Browsers int    `json:"browsers,omitempty"` // Number of connected browser clients
 	CLIs     int    `json:"clis,omitempty"`     // Number of connected CLI clients
@@ -26,6 +26,7 @@ type Room struct {
 	Clients     map[*websocket.Conn]string // Maps WebSocket connection to Client Type ("browser" or "cli")
 	LatestText  string
 	LatestImage string
+	LastUpdated time.Time
 	mu          sync.RWMutex
 }
 
@@ -47,12 +48,43 @@ func (h *Hub) GetRoom(id string) *Room {
 	room, exists := h.rooms[id]
 	if !exists {
 		room = &Room{
-			ID:      id,
-			Clients: make(map[*websocket.Conn]string),
+			ID:          id,
+			Clients:     make(map[*websocket.Conn]string),
+			LastUpdated: time.Now(),
 		}
 		h.rooms[id] = room
 	}
 	return room
+}
+
+// Background worker to purge stale data and empty inactive rooms after 10-30 minutes
+func (h *Hub) StartCleanupWorker() {
+	log.Printf("[Init] Auto-Cleanup & RAM Purge Worker Active (5-min interval)")
+	ticker := time.NewTicker(5 * time.Minute)
+	go func() {
+		for range ticker.C {
+			h.mu.Lock()
+			now := time.Now()
+			for id, room := range h.rooms {
+				room.mu.Lock()
+				if len(room.Clients) == 0 {
+					// Clear text/image cache if empty for > 10 minutes
+					if now.Sub(room.LastUpdated) > 10*time.Minute && (room.LatestText != "" || room.LatestImage != "") {
+						room.LatestText = ""
+						room.LatestImage = ""
+						log.Printf("[Cleanup] Wiped stale text & image RAM cache for empty Room: %s", id)
+					}
+					// Completely delete empty room from RAM if untouched for > 30 minutes
+					if now.Sub(room.LastUpdated) > 30*time.Minute {
+						delete(h.rooms, id)
+						log.Printf("[Purge] Purged inactive Room from RAM: %s", id)
+					}
+				}
+				room.mu.Unlock()
+			}
+			h.mu.Unlock()
+		}
+	}()
 }
 
 func (r *Room) BroadcastStats() {
@@ -83,6 +115,7 @@ var upgrader = websocket.Upgrader{
 
 func main() {
 	hub := NewHub()
+	hub.StartCleanupWorker()
 
 	// WebSocket Endpoint: ws://localhost:8080/ws?room=room-123&client=browser|cli
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -98,19 +131,26 @@ func main() {
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("[Upgrade Error] %v", err)
 			return
 		}
 		defer conn.Close()
 
-		// Set max read limit to 20MB to support high-res base64 screenshots!
+		// Max read payload limit (20MB for high-res base64 screenshots)
 		conn.SetReadLimit(20 * 1024 * 1024)
+
+		// 60-Second Dead Connection Timeout & Ping/Pong Heartbeat Setup
+		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+			return nil
+		})
 
 		room := hub.GetRoom(roomID)
 
 		// Register client connection
 		room.mu.Lock()
 		room.Clients[conn] = clientType
+		room.LastUpdated = time.Now()
 
 		// Push latest room state to the newly connected client
 		if room.LatestText != "" {
@@ -131,7 +171,17 @@ func main() {
 			room.mu.Unlock()
 		}()
 
-		log.Printf("[Connected] %s joined Room: %s", clientType, roomID)
+		// Start Ping Heartbeat Ticker (Pings client every 25 seconds)
+		pingTicker := time.NewTicker(25 * time.Second)
+		defer pingTicker.Stop()
+
+		go func() {
+			for range pingTicker.C {
+				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(5*time.Second)); err != nil {
+					return
+				}
+			}
+		}()
 
 		// Read loop
 		for {
@@ -142,8 +192,12 @@ func main() {
 			}
 			msg.RoomID = roomID
 
+			// Refresh connection deadline on active message
+			conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+
 			// Save to state & broadcast to room
 			room.mu.Lock()
+			room.LastUpdated = time.Now()
 			switch msg.Type {
 			case "text":
 				room.LatestText = msg.Content
@@ -160,9 +214,9 @@ func main() {
 		// Unregister client on disconnect & broadcast stats update
 		room.mu.Lock()
 		delete(room.Clients, conn)
+		room.LastUpdated = time.Now()
 		room.BroadcastStats()
 		room.mu.Unlock()
-		log.Printf("[Disconnected] %s left Room: %s", clientType, roomID)
 	})
 
 	// Health check endpoint for Cloud platforms (Render / Koyeb / Fly.io)
@@ -177,8 +231,8 @@ func main() {
 	}
 
 	fmt.Printf("==================================================\n")
-	fmt.Printf("   ctrlv Stateful WebSocket Relay Server Running  \n")
-	fmt.Printf("   Port: %s | Zero-Auth | Connection Stats     \n", port)
+	fmt.Printf("   ctrlv Stateful WebSocket Relay Server v1.1.0  \n")
+	fmt.Printf("   Port: %s | Zero-Auth | Auto-Cleanup & Purge   \n", port)
 	fmt.Printf("==================================================\n")
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
