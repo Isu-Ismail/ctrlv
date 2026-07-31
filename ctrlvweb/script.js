@@ -116,6 +116,10 @@ function switchView(targetView) {
     if (views[v]) views[v].style.display = (v === targetView) ? "block" : "none";
     if (navBtns[v]) navBtns[v].className = (v === targetView) ? "nav-tab-btn active" : "nav-tab-btn";
   });
+
+  if (targetView === "config") {
+    populateConfigUI();
+  }
 }
 
 if (navBtnDashboard) navBtnDashboard.addEventListener("click", () => switchView("dashboard"));
@@ -254,30 +258,90 @@ if (btnToggleAutoSolve) {
 }
 
 function updateAISolverStatus(state, msg) {
-  if (!aiSolverStatusBadge || !aiSolverStatusText) return;
-  if (state === "solving") {
-    aiSolverStatusBadge.className = "status-pill pending";
-    aiSolverStatusBadge.style.background = "#eff6ff";
-    aiSolverStatusBadge.style.color = "#2563eb";
-    aiSolverStatusBadge.style.borderColor = "#93c5fd";
-    aiSolverStatusText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${msg || "AI Solving..."}`;
-  } else if (state === "success") {
-    aiSolverStatusBadge.className = "status-pill seen";
-    aiSolverStatusText.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg || "Solved & Pushed to PC!"}`;
-  } else if (state === "error") {
-    aiSolverStatusBadge.className = "status-pill offline";
-    aiSolverStatusBadge.style.background = "#fef2f2";
-    aiSolverStatusBadge.style.color = "#dc2626";
-    aiSolverStatusBadge.style.borderColor = "#fca5a5";
-    aiSolverStatusText.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${msg || "AI Error"}`;
+  const badges = [
+    { badge: document.getElementById("aiSolverStatusBadge"), text: document.getElementById("aiSolverStatusText") },
+    { badge: document.getElementById("aiStatusBadge"), text: document.getElementById("aiStatusText") }
+  ];
+
+  badges.forEach(({ badge, text }) => {
+    if (!badge || !text) return;
+    if (state === "solving") {
+      badge.className = "status-pill pending";
+      badge.style.background = "#eff6ff";
+      badge.style.color = "#2563eb";
+      badge.style.borderColor = "#93c5fd";
+      text.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${msg || "AI Solving..."}`;
+    } else if (state === "success") {
+      badge.className = "status-pill seen";
+      badge.style.background = "";
+      badge.style.color = "";
+      badge.style.borderColor = "";
+      text.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg || "Text Received & Pushed to PC!"}`;
+    } else if (state === "ready") {
+      badge.className = "status-pill seen";
+      badge.style.background = "#ecfdf5";
+      badge.style.color = "#059669";
+      badge.style.borderColor = "#a7f3d0";
+      text.innerHTML = `<i class="fa-solid fa-robot"></i> ${msg || "AI Ready"}`;
+    } else if (state === "error") {
+      badge.className = "status-pill offline";
+      badge.style.background = "#fef2f2";
+      badge.style.color = "#dc2626";
+      badge.style.borderColor = "#fca5a5";
+      text.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${msg || "AI Key Missing"}`;
+    } else {
+      badge.className = "status-pill pending";
+      badge.style.background = "";
+      badge.style.color = "";
+      badge.style.borderColor = "";
+      text.innerHTML = `<i class="fa-solid fa-robot"></i> ${msg || "AI Ready"}`;
+    }
+  });
+}
+
+function checkAIKeyStatus() {
+  const cfg = getAIConfig();
+  if (cfg && cfg.apiKey && cfg.apiKey.trim().length >= 5) {
+    updateAISolverStatus("ready", "AI Ready");
   } else {
-    aiSolverStatusBadge.className = "status-pill pending";
-    aiSolverStatusBadge.style.background = "";
-    aiSolverStatusBadge.style.color = "";
-    aiSolverStatusBadge.style.borderColor = "";
-    aiSolverStatusText.innerHTML = `<i class="fa-solid fa-robot"></i> ${msg || "AI Ready"}`;
+    updateAISolverStatus("error", "AI Key Missing");
   }
 }
+
+// Initial AI Key Status Check
+checkAIKeyStatus();
+
+// -----------------------------------------------------------------------------
+// Error Alert Modal Popup (Glassmorphic Window with OK / Cancel Controls)
+// -----------------------------------------------------------------------------
+const errorModal = document.getElementById("errorModal");
+const errorModalTitle = document.getElementById("errorModalTitle");
+const errorModalBody = document.getElementById("errorModalBody");
+const btnErrorOk = document.getElementById("btnErrorOk");
+const btnErrorCancel = document.getElementById("btnErrorCancel");
+
+function showErrorModal(title, msg) {
+  if (errorModalTitle) errorModalTitle.textContent = title || "API Provider Error";
+  if (errorModalBody) errorModalBody.textContent = msg || "An unknown error occurred.";
+  if (errorModal) errorModal.style.display = "flex";
+}
+
+function hideErrorModal() {
+  if (errorModal) errorModal.style.display = "none";
+}
+
+if (btnErrorOk) btnErrorOk.addEventListener("click", hideErrorModal);
+if (btnErrorCancel) btnErrorCancel.addEventListener("click", hideErrorModal);
+if (errorModal) {
+  errorModal.addEventListener("click", (e) => {
+    if (e.target === errorModal) hideErrorModal();
+  });
+}
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && errorModal && errorModal.style.display === "flex") {
+    hideErrorModal();
+  }
+});
 
 function resolveAIProvider(provider, apiKey) {
   if (provider && provider !== "auto") return provider;
@@ -432,7 +496,8 @@ async function solveImageWithGemini(b64ImageData, promptText) {
     updateAISolverStatus("success", "Text Received & Pushed to PC!");
   } catch (err) {
     console.error("AI Solver error:", err);
-    updateAISolverStatus("error", err.message || "Failed to solve with AI");
+    updateAISolverStatus("error", "AI Error");
+    showErrorModal("API Provider Error", err.message || "Failed to solve with AI");
   } finally {
     isSolvingAI = false;
   }
@@ -536,7 +601,8 @@ async function solveTextWithGemini(questionText, promptText) {
     updateAISolverStatus("success", "Text Received & Pushed to PC!");
   } catch (err) {
     console.error("AI Text Solver error:", err);
-    updateAISolverStatus("error", err.message || "AI Solving failed");
+    updateAISolverStatus("error", "AI Error");
+    showErrorModal("API Provider Error", err.message || "AI Solving failed");
   } finally {
     isSolvingAI = false;
   }
@@ -834,6 +900,90 @@ if (screenshotImg) {
 if (btnCloseModal) {
   btnCloseModal.addEventListener("click", () => {
     imageModal.style.display = "none";
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Config Form Manager (Load, Save, Reset, Key Visibility Toggle)
+// -----------------------------------------------------------------------------
+const aiProviderSelect = document.getElementById("aiProviderSelect");
+const aiModelInput = document.getElementById("aiModelInput");
+const aiApiKeyInput = document.getElementById("aiApiKeyInput");
+const aiCodeOnlyCheck = document.getElementById("aiCodeOnlyCheck");
+const aiPromptInput = document.getElementById("aiPromptInput");
+const relayUrlInput = document.getElementById("relayUrlInput");
+const btnSaveAI = document.getElementById("btnSaveAI");
+const btnResetAI = document.getElementById("btnResetAI");
+const btnToggleKeyVis = document.getElementById("btnToggleKeyVis");
+const eyeIcon = document.getElementById("eyeIcon");
+
+function populateConfigUI() {
+  const cfg = getAIConfig();
+  if (aiProviderSelect) aiProviderSelect.value = cfg.provider || "auto";
+  if (aiModelInput) aiModelInput.value = cfg.model || "openrouter/auto";
+  if (aiApiKeyInput) aiApiKeyInput.value = cfg.apiKey || "";
+  if (aiCodeOnlyCheck) aiCodeOnlyCheck.checked = cfg.codeOnly !== false;
+  if (aiPromptInput) aiPromptInput.value = cfg.customPrompt || "";
+
+  const savedRelay = localStorage.getItem("ctrlv_relay_url") || "wss://ctrlv.onrender.com/ws";
+  if (relayUrlInput) relayUrlInput.value = savedRelay;
+}
+
+// Populate fields on startup
+populateConfigUI();
+
+if (btnToggleKeyVis) {
+  btnToggleKeyVis.addEventListener("click", () => {
+    if (!aiApiKeyInput) return;
+    const isPass = aiApiKeyInput.type === "password";
+    aiApiKeyInput.type = isPass ? "text" : "password";
+    if (eyeIcon) {
+      eyeIcon.className = isPass ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+    }
+  });
+}
+
+if (btnSaveAI) {
+  btnSaveAI.addEventListener("click", () => {
+    const provider = aiProviderSelect ? aiProviderSelect.value : "auto";
+    const model = aiModelInput ? aiModelInput.value.trim() : "openrouter/auto";
+    const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
+    const codeOnly = aiCodeOnlyCheck ? aiCodeOnlyCheck.checked : true;
+    const customPrompt = aiPromptInput ? aiPromptInput.value.trim() : "";
+    const relayUrl = relayUrlInput ? relayUrlInput.value.trim() : "";
+
+    saveAIConfig(provider, apiKey, model, codeOnly, customPrompt);
+
+    if (relayUrl) {
+      localStorage.setItem("ctrlv_relay_url", relayUrl);
+    }
+
+    if (aiInstructionInput && customPrompt) {
+      aiInstructionInput.value = customPrompt;
+    }
+
+    checkAIKeyStatus();
+
+    const origHTML = btnSaveAI.innerHTML;
+    btnSaveAI.innerHTML = `<i class="fa-solid fa-check"></i> Settings Saved!`;
+    btnSaveAI.style.background = "var(--accent-green)";
+    setTimeout(() => {
+      btnSaveAI.innerHTML = origHTML;
+      btnSaveAI.style.background = "";
+    }, 2000);
+  });
+}
+
+if (btnResetAI) {
+  btnResetAI.addEventListener("click", () => {
+    clearAIConfig();
+    populateConfigUI();
+    checkAIKeyStatus();
+    const origHTML = btnResetAI.innerHTML;
+    btnResetAI.innerHTML = `<i class="fa-solid fa-check"></i> Reset!`;
+    setTimeout(() => {
+      btnResetAI.innerHTML = origHTML;
+    }, 2000);
   });
 }
 

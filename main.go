@@ -136,15 +136,15 @@ func main() {
 				if err == nil && text != "" {
 					_ = clipboard.WriteAll(text)
 					if !quiet {
-						fmt.Printf("[SUCCESS] Fetched AI solution and updated PC clipboard: \"%s\"\n", text)
+						fmt.Printf("[SUCCESS] Fetched Text and updated PC clipboard: \"%s\"\n", text)
 					}
 					return
 				}
 				if !quiet {
-					fmt.Println("[Error] Could not fetch AI solution from relay server!")
+					fmt.Println("[Error] Could not fetch Text from relay server!")
 				}
 			} else if !quiet {
-				fmt.Println("[SUCCESS] Triggered fetch & updated PC system clipboard with AI solution!")
+				fmt.Println("[SUCCESS] Triggered fetch & updated PC system clipboard with Text!")
 			}
 			return
 		case "logs":
