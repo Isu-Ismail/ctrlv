@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -91,31 +90,46 @@ func main() {
 		case "snap":
 			quiet := hasQuietFlag(args[1:])
 			roomID := resolveActiveRoomID(args[1:], *roomFlag)
-			credPath := findServiceAccountKey()
-			if err := service.StandaloneSnap(credPath, roomID, quiet); err != nil {
+			relayService := service.NewRelayService("")
+			b64Img, err := service.CaptureScreenSilent()
+			if err != nil {
 				if !quiet {
-					fmt.Printf("[Error] Snap failed: %v\n", err)
+					fmt.Printf("[Error] Screen capture failed: %v\n", err)
 				}
+				return
+			}
+			if err := relayService.UploadScreenshot(roomID, b64Img); err != nil {
+				if !quiet {
+					fmt.Printf("[Error] Snap upload failed: %v\n", err)
+				}
+			} else if !quiet {
+				fmt.Printf("[SUCCESS] Screenshot uploaded to room '%s' via Relay!\n", roomID)
 			}
 			return
 		case "text":
 			quiet := hasQuietFlag(args[1:])
 			roomID := resolveActiveRoomID(args[1:], *roomFlag)
-			credPath := findServiceAccountKey()
-			if err := service.StandaloneSendText(credPath, roomID, quiet); err != nil {
+			relayService := service.NewRelayService("")
+			clipText, err := clipboard.ReadAll()
+			if err != nil || clipText == "" {
 				if !quiet {
-					fmt.Printf("[Error] Send text failed: %v\n", err)
+					fmt.Println("[Error] Clipboard is empty or unreadable!")
 				}
+				return
+			}
+			if err := relayService.UploadQuestionText(roomID, clipText); err != nil {
+				if !quiet {
+					fmt.Printf("[Error] Text upload failed: %v\n", err)
+				}
+			} else if !quiet {
+				fmt.Printf("[SUCCESS] Clipboard text uploaded to room '%s' via Relay!\n", roomID)
 			}
 			return
 		case "fetch":
 			quiet := hasQuietFlag(args[1:])
-			roomID := resolveActiveRoomID(args[1:], *roomFlag)
-			credPath := findServiceAccountKey()
-			if err := service.StandaloneFetch(credPath, roomID, quiet); err != nil {
-				if !quiet {
-					fmt.Printf("[Error] Fetch failed: %v\n", err)
-				}
+			clipText, err := clipboard.ReadAll()
+			if err == nil && clipText != "" && !quiet {
+				fmt.Printf("[Clipboard] Current text on system clipboard: \"%s\"\n", clipText)
 			}
 			return
 		case "logs":
@@ -387,27 +401,16 @@ func hasQuietFlag(args []string) bool {
 func spawnBackgroundDaemon(roomID string, wantScreen bool) {
 	checkServiceAlreadyRunning()
 
-	credPath := findServiceAccountKey()
-	if credPath == "" {
-		home, _ := os.UserHomeDir()
-		fmt.Printf("Error: serviceAccountKey.json not found!\n-> Place your key file at: %s\\.ctrlv\\serviceAccountKey.json\nExiting without starting background service.\n", home)
-		os.Exit(1)
-	}
+	fmt.Println("Verifying WebSocket Relay Server connection...")
+	relayService := service.NewRelayService("")
 
-	fmt.Println("Verifying Firebase connection and credentials...")
-	fsService, err := service.NewFirestoreService(credPath)
-	if err != nil {
-		fmt.Printf("[Error] Failed to initialize Firebase service: %v\nExiting without starting background process.\n", err)
+	if err := relayService.VerifyConnection(roomID); err != nil {
+		fmt.Printf("[Error] Relay Server connection verification failed: %v\nExiting without starting background process.\n", err)
+		relayService.Close()
 		os.Exit(1)
 	}
-
-	if err := fsService.VerifyConnection(roomID); err != nil {
-		fmt.Printf("[Error] Firebase connection verification failed: %v\n-> Check network connectivity or serviceAccountKey.json credentials.\nExiting without starting background process.\n", err)
-		fsService.Close()
-		os.Exit(1)
-	}
-	fsService.Close()
-	fmt.Println("[Firestore] Connection & credentials verified successfully!")
+	relayService.Close()
+	fmt.Println("[Relay] WebSocket Connection verified successfully!")
 
 	execPath, err := os.Executable()
 	if err != nil {
@@ -427,15 +430,16 @@ func spawnBackgroundDaemon(roomID string, wantScreen bool) {
 	}
 
 	fmt.Println("==================================================")
-	fmt.Printf("           ctrlv Service Started                  \n")
+	fmt.Printf("           ctrlv Service Started (Relay Mode)     \n")
 	fmt.Println("==================================================")
 	fmt.Printf(" Connecting to Room ID : %s\n", roomID)
+	fmt.Printf(" Relay Server          : %s\n", service.GetRelayURL())
 	fmt.Printf(" Background Process PID: %d\n", cmd.Process.Pid)
 	fmt.Println(" Status                : Active (Running in background)")
 	fmt.Println(" Realtime Auto-Push    : Active (Text automatically copied to PC clipboard)")
 	fmt.Println(" Hotkeys Active        : Ctrl + Shift + S (Screenshot)")
 	fmt.Println("                       : Ctrl + Shift + T (Send Clipboard Text Question)")
-	fmt.Println("                       : Ctrl + Shift + F (Fetch Text Manual Re-Sync)")
+	fmt.Println("                       : Ctrl + Shift + F (Re-Copy Clipboard Text)")
 	if wantScreen {
 		fmt.Println(" Stealth Protection    : ON (Screen-Share Invisible Overlay Active!)")
 	}
@@ -450,34 +454,21 @@ func runDaemon(roomID string, wantScreen bool) {
 	// Direct all log output to in-memory broadcast hub (Zero Disk Files)
 	log.SetOutput(service.GlobalLogHub)
 
-	credPath := findServiceAccountKey()
-	if credPath == "" {
-		home, _ := os.UserHomeDir()
-		log.Fatalf("Error: serviceAccountKey.json not configured!\n-> Global folder created at: %s\\.ctrlv\\\n-> Template created at: %s\\.ctrlv\\serviceAccountKey.json\nPlease paste your Firebase serviceAccountKey.json into that file and run ctrlv again.", home, home)
-	}
+	log.Printf("[Daemon] Relay worker started for Room ID: %s (PID: %d)", roomID, os.Getpid())
 
-	log.Printf("[Daemon] Worker started for Room ID: %s (PID: %d)", roomID, os.Getpid())
-
-	// Launch Stealth Screen-Share Protection Overlay Window if -s flag was set
 	if wantScreen {
 		go service.LaunchStealthOverlay(roomID)
 	}
 
-	// Initialize Firestore Service
-	fsService, err := service.NewFirestoreService(credPath)
-	if err != nil {
-		log.Fatalf("Failed to initialize Firestore service: %v", err)
-	}
-	defer fsService.Close()
+	relayService := service.NewRelayService("")
+	defer relayService.Close()
 
 	stopChan := make(chan struct{})
 
-	// Real-Time Firestore Background Snapshot Listener:
-	// Automatically pushes new text to PC system clipboard & updates Stealth Overlay instantly!
 	ctx, cancelListener := context.WithCancel(context.Background())
 	defer cancelListener()
 
-	go fsService.ListenRoomUpdates(ctx, roomID, func(rawText string) {
+	go relayService.ListenRoomUpdates(ctx, roomID, func(rawText string) {
 		cleanText := rawText
 		if len(cleanText) > 6 && cleanText[len(cleanText)-6:] == "\n/---/" {
 			cleanText = cleanText[:len(cleanText)-6]
@@ -510,14 +501,14 @@ func runDaemon(roomID string, wantScreen bool) {
 			}
 			return
 		}
-		if err := fsService.UploadScreenshot(roomID, b64Img); err != nil {
+		if err := relayService.UploadScreenshot(roomID, b64Img); err != nil {
 			log.Printf("[Upload Error] %v", err)
 			if wantScreen {
 				service.UpdateOverlayStatus("Upload Error!")
 			}
 		} else {
 			if wantScreen {
-				service.UpdateOverlayStatus("Screenshot Sent Successfully!")
+				service.UpdateOverlayStatus("Screenshot Sent Successfully via Relay!")
 			}
 		}
 	}
@@ -525,25 +516,19 @@ func runDaemon(roomID string, wantScreen bool) {
 	// Callback for Manual Re-Fetch Text (Ctrl + Shift + F)
 	onFetchText := func() {
 		if wantScreen {
-			service.UpdateOverlayStatus("Fetching Text...")
+			service.UpdateOverlayStatus("Reading Clipboard...")
 		}
-		text, err := fsService.FetchTextAndMarkSeen(roomID)
-		if err != nil {
-			log.Printf("[Fetch Error] %v", err)
+		text, err := clipboard.ReadAll()
+		if err != nil || text == "" {
+			log.Printf("[Clipboard Error] %v", err)
 			if wantScreen {
-				service.UpdateOverlayStatus("Fetch Error!")
+				service.UpdateOverlayStatus("Clipboard Empty!")
 			}
 			return
 		}
-		if err := clipboard.WriteAll(text); err != nil {
-			log.Printf("[Clipboard Error] Failed to write text to clipboard: %v", err)
-		} else {
-			log.Printf("[Clipboard] Copied text to system clipboard: \"%s\"", text)
-		}
-
 		if wantScreen {
 			service.UpdateOverlayText(text)
-			service.UpdateOverlayStatus("Text Fetched & Copied!")
+			service.UpdateOverlayStatus("Clipboard Text Re-Synced!")
 		}
 	}
 
@@ -563,32 +548,29 @@ func runDaemon(roomID string, wantScreen bool) {
 			return
 		}
 
-		if err := fsService.UploadQuestionText(roomID, clipText); err != nil {
+		if err := relayService.UploadQuestionText(roomID, clipText); err != nil {
 			log.Printf("[Upload Error] Failed to upload question text: %v", err)
 			if wantScreen {
 				service.UpdateOverlayStatus("Failed to Upload Text!")
 			}
 		} else {
-			log.Printf("[Firestore] Uploaded PC clipboard text: \"%s\"", clipText)
+			log.Printf("[Relay] Uploaded PC clipboard text: \"%s\"", clipText)
 			if wantScreen {
-				service.UpdateOverlayStatus("PC Clipboard Text Sent to Firebase!")
+				service.UpdateOverlayStatus("PC Clipboard Text Sent via Relay!")
 			}
 		}
 	}
 
-	// Initialize IPC Server with callbacks
-	ipcServer := service.NewIPCServer("firebase", roomID, stopChan, onScreenshot, onFetchText, onSendText)
+	ipcServer := service.NewIPCServer("relay", roomID, stopChan, onScreenshot, onFetchText, onSendText)
 	if err := ipcServer.Start(); err != nil {
 		log.Printf("IPC Server warning: %v", err)
 	}
 	defer ipcServer.Stop()
 
-	// Initialize & Start Hotkey Handler
 	hotkeyHandler := service.NewHotkeyHandler(onScreenshot, onFetchText, onSendText)
 	go hotkeyHandler.Start()
 	defer hotkeyHandler.Stop()
 
-	// Signal handling for graceful OS termination
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
@@ -606,15 +588,15 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  ctrlv config             Open ctrlv_config.json in text editor (notepad/nano/saved editor)")
 	fmt.Println("  ctrlv config -e <editor>  Set preferred editor (e.g. code, notepad, nano) & open config")
-	fmt.Println("  ctrlv standalone        Run Direct AI mode (Zero Firebase needed! Direct 1-second AI solve)")
+	fmt.Println("  ctrlv standalone        Run Direct AI mode (Direct 1-second AI solve)")
 	fmt.Println("  ctrlv standalone -s     Run Direct AI mode + Screen-Share Invisible Overlay Notepad")
-	fmt.Println("  ctrlv -r <roomid>       Start Firebase room sync background service")
-	fmt.Println("  ctrlv -r <roomid> -s    Start Firebase room sync + Stealth Overlay Notepad")
+	fmt.Println("  ctrlv -r <roomid>       Start Room sync background service (Zero-Config Relay)")
+	fmt.Println("  ctrlv -r <roomid> -s    Start Room sync + Stealth Overlay Notepad")
 	fmt.Println("  ctrlv setup             Auto-configure GNOME silent shortcuts & disable camera sound (Linux)")
 	fmt.Println("  ctrlv status            Check if ctrlv service is currently running")
-	fmt.Println("  ctrlv snap              Trigger silent screen capture & upload to Firestore")
-	fmt.Println("  ctrlv text              Trigger sending clipboard question text to Firestore")
-	fmt.Println("  ctrlv fetch             Fetch text from Firestore & copy directly to system clipboard")
+	fmt.Println("  ctrlv snap              Trigger silent screen capture & upload to room")
+	fmt.Println("  ctrlv text              Trigger sending clipboard question text to room")
+	fmt.Println("  ctrlv fetch             Re-read current text from system clipboard")
 	fmt.Println("  ctrlv logs              View current in-memory daemon logs")
 	fmt.Println("  ctrlv logs -t           Stream live in-memory logs in real time")
 	fmt.Println("  ctrlv stop              Stop the running ctrlv background service")
@@ -623,42 +605,6 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Hotkeys when running:")
 	fmt.Println("  Ctrl + Shift + S        Silently capture screen & solve/upload")
-	fmt.Println("  Ctrl + Shift + T        Send PC clipboard text question to AI/Firebase")
-	fmt.Println("  Ctrl + Shift + F        Manual re-fetch text & copy to clipboard")
-}
-
-func findServiceAccountKey() string {
-	home, err := os.UserHomeDir()
-	if err == nil {
-		ctrlvDir := filepath.Join(home, ".ctrlv")
-		_ = os.MkdirAll(ctrlvDir, 0755)
-
-		globalKeyPath := filepath.Join(ctrlvDir, "serviceAccountKey.json")
-		if _, err := os.Stat(globalKeyPath); err == nil {
-			return globalKeyPath
-		}
-	}
-
-	var candidates []string
-
-	candidates = append(candidates, "serviceAccountKey.json")
-
-	if execPath, err := os.Executable(); err == nil {
-		execDir := filepath.Dir(execPath)
-		candidates = append(candidates, filepath.Join(execDir, "serviceAccountKey.json"))
-	}
-
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-
-	if home != "" {
-		placeholderPath := filepath.Join(home, ".ctrlv", "serviceAccountKey.json")
-		placeholderContent := "{\n  \"_comment\": \"Paste your Firebase serviceAccountKey.json contents here\"\n}\n"
-		_ = os.WriteFile(placeholderPath, []byte(placeholderContent), 0644)
-	}
-
-	return ""
+	fmt.Println("  Ctrl + Shift + T        Send PC clipboard text question to room")
+	fmt.Println("  Ctrl + Shift + F        Re-sync current text on clipboard")
 }

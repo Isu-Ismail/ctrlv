@@ -11,11 +11,10 @@ import (
 )
 
 type AppConfig struct {
-	ProjectID   string `json:"project_id"`
-	ClientEmail string `json:"client_email"`
-	APIKey      string `json:"api_key"`
-	Model       string `json:"model"`
-	Editor      string `json:"editor"`
+	APIKey   string `json:"api_key"`
+	Model    string `json:"model"`
+	RelayURL string `json:"relay_url"`
+	Editor   string `json:"editor"`
 }
 
 func GetConfigPath() string {
@@ -32,11 +31,10 @@ func EnsureConfigExists() (string, *AppConfig, error) {
 	configPath := GetConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		defaultCfg := &AppConfig{
-			ProjectID:   "",
-			ClientEmail: "",
-			APIKey:      "",
-			Model:       "openrouter/auto",
-			Editor:      "",
+			APIKey:   "",
+			Model:    "openrouter/auto",
+			RelayURL: "wss://ctrlv.onrender.com/ws",
+			Editor:   "",
 		}
 		if err := SaveAppConfig(defaultCfg); err != nil {
 			return configPath, defaultCfg, fmt.Errorf("failed to create default config at %s: %w", configPath, err)

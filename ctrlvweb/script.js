@@ -1,47 +1,39 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getFirebaseConfig, getAIConfig } from "./config.js";
+import { getAIConfig, saveAIConfig, clearAIConfig } from "./config.js";
 
-const firebaseConfig = getFirebaseConfig();
+// UI Elements: Navigation & Views
+const navBtnDashboard = document.getElementById("navBtnDashboard");
+const navBtnDownload = document.getElementById("navBtnDownload");
+const navBtnConfig = document.getElementById("navBtnConfig");
+const viewDashboard = document.getElementById("viewDashboard");
+const viewDownload = document.getElementById("viewDownload");
+const viewConfig = document.getElementById("viewConfig");
+const brandLogoBtn = document.getElementById("brandLogoBtn");
 
-let app = null;
-let db = null;
-
-if (firebaseConfig) {
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-  } catch (err) {
-    console.error("Firebase init error:", err);
-  }
-}
-
-// UI Elements
+// UI Elements: Room & Header
 const roomIdInput = document.getElementById("roomIdInput");
 const btnConnect = document.getElementById("btnConnect");
 const btnConnectText = document.getElementById("btnConnectText");
 const connStatusBadge = document.getElementById("connStatusBadge");
 const connStatusText = document.getElementById("connStatusText");
+const clientCountsBadge = document.getElementById("clientCountsBadge");
+const browserCount = document.getElementById("browserCount");
+const pcCount = document.getElementById("pcCount");
+const btnCopyRoom = document.getElementById("btnCopyRoom");
+const btnGenRandomRoom = document.getElementById("btnGenRandomRoom");
+
+// UI Elements: Dashboard Sync
 const screenshotImg = document.getElementById("screenshotImg");
 const emptyState = document.getElementById("emptyState");
 const textInput = document.getElementById("textInput");
 const btnSendText = document.getElementById("btnSendText");
-const btnSendTextLabel = document.getElementById("btnSendTextLabel");
-const statusBadge = document.getElementById("statusBadge");
 const imageModal = document.getElementById("imageModal");
 const modalImg = document.getElementById("modalImg");
 const btnCloseModal = document.getElementById("btnCloseModal");
-const btnCopyRoom = document.getElementById("btnCopyRoom");
 const btnToggleAutoDownload = document.getElementById("btnToggleAutoDownload");
 const autoDlLabel = document.getElementById("autoDlLabel");
 const btnDownloadImg = document.getElementById("btnDownloadImg");
-const btnFetchScreenshot = document.getElementById("btnFetchScreenshot");
-const fetchImgLabel = document.getElementById("fetchImgLabel");
-const btnFetchPCText = document.getElementById("btnFetchPCText");
-const fetchTextLabel = document.getElementById("fetchTextLabel");
-const btnOpenHistory = document.getElementById("btnOpenHistory");
 
-// Gemini & Multi-Provider AI Vision UI Elements
+// UI Elements: AI Solver
 const btnToggleAutoSolve = document.getElementById("btnToggleAutoSolve");
 const autoSolveLabel = document.getElementById("autoSolveLabel");
 const btnSolveGemini = document.getElementById("btnSolveGemini");
@@ -49,39 +41,88 @@ const aiInstructionInput = document.getElementById("aiInstructionInput");
 const aiSolverStatusBadge = document.getElementById("aiSolverStatusBadge");
 const aiSolverStatusText = document.getElementById("aiSolverStatusText");
 
-// Tabbed UI Elements
+// UI Elements: Tabs
 const tabBtnScreenshot = document.getElementById("tabBtnScreenshot");
 const tabBtnPCText = document.getElementById("tabBtnPCText");
 const screenshotViewer = document.getElementById("screenshotViewer");
 const pcSentTextViewer = document.getElementById("pcSentTextViewer");
 const pcSentTextDisplay = document.getElementById("pcSentTextDisplay");
 const screenshotActions = document.getElementById("screenshotActions");
-const pcTextActions = document.getElementById("pcTextActions");
 const btnSolvePCSentText = document.getElementById("btnSolvePCSentText");
 
-let activeTab = "screenshot"; // "screenshot" or "pctext"
-let unsubscribe = null;
+// UI Elements: Theme Switcher
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const themeToggleIcon = document.getElementById("themeToggleIcon");
+
+// Initialize Theme from localStorage
+const storedTheme = localStorage.getItem("ctrlv_theme") || "dark";
+document.documentElement.setAttribute("data-theme", storedTheme);
+if (themeToggleIcon) {
+  themeToggleIcon.className = storedTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+}
+
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", () => {
+    const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
+    const newTheme = currentTheme === "light" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("ctrlv_theme", newTheme);
+    if (themeToggleIcon) {
+      themeToggleIcon.className = newTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+    }
+  });
+}
+
+// State Variables
+let activeView = "dashboard";
+let activeTab = "screenshot";
+let ws = null;
 let isConnected = false;
 let autoDownload = localStorage.getItem("ctrlv_auto_download") === "true";
-let autoSolveEnabled = localStorage.getItem("ctrlv_auto_solve") !== "false"; // Default ON
-let currentRoomId = localStorage.getItem("ctrlv_room_id") || "room-alpha-123";
+let autoSolveEnabled = localStorage.getItem("ctrlv_auto_solve") !== "false";
+let currentRoomId = localStorage.getItem("ctrlv_room_id") || "ctrlv-a8f3b2";
 let isSolvingAI = false;
+
+// Cache variables to prevent laggy DOM re-renders
+let cachedImagePath = null;
+let cachedPCSentText = null;
 
 if (roomIdInput) roomIdInput.value = currentRoomId;
 
-// Populate initial prompt from AI config if saved
+// Populate initial prompt from AI config
 const savedAiConfig = getAIConfig();
 if (aiInstructionInput && savedAiConfig.customPrompt) {
   aiInstructionInput.value = savedAiConfig.customPrompt;
 }
 
-// Cache variables to prevent laggy DOM re-renders
-let cachedImagePath = null;
-let cachedText = null;
-let cachedFetchedStatus = null;
-let cachedPCSentText = null;
+// -----------------------------------------------------------------------------
+// 1. SPA View Switching (Zero Page Reload = 100% Stable Connection Across Screens)
+// -----------------------------------------------------------------------------
+function switchView(targetView) {
+  activeView = targetView;
+  const views = {
+    dashboard: viewDashboard,
+    download: viewDownload,
+    config: viewConfig
+  };
+  const navBtns = {
+    dashboard: navBtnDashboard,
+    download: navBtnDownload,
+    config: navBtnConfig
+  };
 
-// Tab Switching Logic
+  Object.keys(views).forEach(v => {
+    if (views[v]) views[v].style.display = (v === targetView) ? "block" : "none";
+    if (navBtns[v]) navBtns[v].className = (v === targetView) ? "nav-tab-btn active" : "nav-tab-btn";
+  });
+}
+
+if (navBtnDashboard) navBtnDashboard.addEventListener("click", () => switchView("dashboard"));
+if (navBtnDownload) navBtnDownload.addEventListener("click", () => switchView("download"));
+if (navBtnConfig) navBtnConfig.addEventListener("click", () => switchView("config"));
+if (brandLogoBtn) brandLogoBtn.addEventListener("click", (e) => { e.preventDefault(); switchView("dashboard"); });
+
+// Tab Switching inside Dashboard
 function switchTab(tab) {
   activeTab = tab;
   if (tab === "screenshot") {
@@ -90,21 +131,21 @@ function switchTab(tab) {
     if (screenshotViewer) screenshotViewer.style.display = "flex";
     if (pcSentTextViewer) pcSentTextViewer.style.display = "none";
     if (screenshotActions) screenshotActions.style.display = "flex";
-    if (pcTextActions) pcTextActions.style.display = "none";
   } else {
     if (tabBtnScreenshot) tabBtnScreenshot.className = "tab-btn";
     if (tabBtnPCText) tabBtnPCText.className = "tab-btn active";
     if (screenshotViewer) screenshotViewer.style.display = "none";
     if (pcSentTextViewer) pcSentTextViewer.style.display = "block";
     if (screenshotActions) screenshotActions.style.display = "none";
-    if (pcTextActions) pcTextActions.style.display = "flex";
   }
 }
 
 if (tabBtnScreenshot) tabBtnScreenshot.addEventListener("click", () => switchTab("screenshot"));
 if (tabBtnPCText) tabBtnPCText.addEventListener("click", () => switchTab("pctext"));
 
-// Persistent Local Storage Cache for Screenshot
+// -----------------------------------------------------------------------------
+// 2. Persistent Local Storage Cache & Image Viewing
+// -----------------------------------------------------------------------------
 function getCachedScreenshot() {
   try {
     return localStorage.getItem(`ctrlv_last_screenshot_${currentRoomId}`) || null;
@@ -132,20 +173,14 @@ function loadAndDisplayCachedScreenshot() {
   }
 }
 
-// Initial UI Setup
+// Initial UI Toggle Displays
 updateAutoDownloadUI();
 updateAutoSolveUI();
 
-// Auto Download Toggle
 function updateAutoDownloadUI() {
   if (!btnToggleAutoDownload) return;
-  if (autoDownload) {
-    btnToggleAutoDownload.className = "btn-tool active";
-    autoDlLabel.textContent = "Auto-Save: ON";
-  } else {
-    btnToggleAutoDownload.className = "btn-tool";
-    autoDlLabel.textContent = "Auto-Save: OFF";
-  }
+  btnToggleAutoDownload.className = autoDownload ? "btn-tool active" : "btn-tool";
+  autoDlLabel.textContent = autoDownload ? "Auto-Save: ON" : "Auto-Save: OFF";
 }
 
 if (btnToggleAutoDownload) {
@@ -156,16 +191,10 @@ if (btnToggleAutoDownload) {
   });
 }
 
-// Auto Solve Toggle
 function updateAutoSolveUI() {
   if (!btnToggleAutoSolve) return;
-  if (autoSolveEnabled) {
-    btnToggleAutoSolve.className = "btn-tool active";
-    if (autoSolveLabel) autoSolveLabel.textContent = "Auto-Solve: ON";
-  } else {
-    btnToggleAutoSolve.className = "btn-tool";
-    if (autoSolveLabel) autoSolveLabel.textContent = "Auto-Solve: OFF";
-  }
+  btnToggleAutoSolve.className = autoSolveEnabled ? "btn-tool active" : "btn-tool";
+  if (autoSolveLabel) autoSolveLabel.textContent = autoSolveEnabled ? "Auto-Solve: ON" : "Auto-Solve: OFF";
 }
 
 if (btnToggleAutoSolve) {
@@ -202,13 +231,15 @@ function updateAISolverStatus(state, msg) {
   }
 }
 
-// Function to call Multi-Provider Vision REST APIs (OpenRouter Auto, Groq Free, Google AI Studio)
+// -----------------------------------------------------------------------------
+// 3. Multi-Provider Vision AI Solver (OpenRouter / Groq / Google AI Studio)
+// -----------------------------------------------------------------------------
 async function solveImageWithGemini(b64ImageData, promptText) {
   if (isSolvingAI) return;
 
   const aiConfig = getAIConfig();
   if (!aiConfig || !aiConfig.apiKey) {
-    updateAISolverStatus("error", "Configure AI Key in Config page first!");
+    updateAISolverStatus("error", "Configure AI Key in Config tab first!");
     return;
   }
 
@@ -342,7 +373,7 @@ async function solveImageWithGemini(b64ImageData, promptText) {
     }
 
     textInput.value = generatedText;
-    await sendTextToFirestoreAuto(generatedText);
+    sendTextToRelay(generatedText);
     updateAISolverStatus("success", "Solved Screenshot & Pushed to PC!");
   } catch (err) {
     console.error("AI Solver error:", err);
@@ -352,13 +383,12 @@ async function solveImageWithGemini(b64ImageData, promptText) {
   }
 }
 
-// Solve Question Text sent from PC (Ctrl+Shift+T)
 async function solveTextWithGemini(questionText, promptText) {
   if (isSolvingAI) return;
 
   const aiConfig = getAIConfig();
   if (!aiConfig || !aiConfig.apiKey) {
-    updateAISolverStatus("error", "Configure AI Key in Config page first!");
+    updateAISolverStatus("error", "Configure AI Key in Config tab first!");
     return;
   }
 
@@ -447,7 +477,7 @@ async function solveTextWithGemini(questionText, promptText) {
     }
 
     textInput.value = generatedText;
-    await sendTextToFirestoreAuto(generatedText);
+    sendTextToRelay(generatedText);
     updateAISolverStatus("success", "Text Solved & Pushed to PC!");
   } catch (err) {
     console.error("AI Text Solver error:", err);
@@ -457,36 +487,19 @@ async function solveTextWithGemini(questionText, promptText) {
   }
 }
 
-// Function to extract clean code from markdown code fences
 function parseCleanCodeOnly(rawText) {
   if (!rawText) return "";
-
   const codeBlockRegex = /```(?:[a-zA-Z0-9_+-]+)?\n([\s\S]*?)```/g;
   const matches = [...rawText.matchAll(codeBlockRegex)];
-
   if (matches.length > 0) {
     return matches.map(m => m[1].trim()).join("\n\n");
   }
-
   return rawText.trim();
 }
 
-async function sendTextToFirestoreAuto(cleanText) {
-  if (!db || !currentRoomId) return;
-
-  try {
-    const formattedText = cleanText + "\n/---/";
-    const roomRef = doc(db, "room", currentRoomId);
-    await setDoc(roomRef, {
-      uploaded_text: formattedText,
-      fetched: false
-    }, { merge: true });
-
-    saveToHistory(currentRoomId, cleanText);
-    console.log("Auto-pushed solution to Firestore!");
-  } catch (err) {
-    console.error("Auto push error:", err);
-  }
+function sendTextToRelay(cleanText) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !cleanText) return;
+  ws.send(JSON.stringify({ type: "text", room_id: currentRoomId, content: cleanText }));
 }
 
 if (btnSolveGemini) {
@@ -522,26 +535,9 @@ if (btnSolvePCSentText) {
   });
 }
 
-function saveToHistory(roomId, text) {
-  if (!text || text.trim() === "") return;
-  try {
-    const key = `ctrlv_history_${roomId}`;
-    let history = JSON.parse(localStorage.getItem(key) || "[]");
-    
-    history.unshift({
-      id: Date.now(),
-      text: text,
-      time: new Date().toLocaleString()
-    });
-    
-    if (history.length > 20) history = history.slice(0, 20);
-    
-    localStorage.setItem(key, JSON.stringify(history));
-  } catch (e) {
-    console.warn("Failed to save history:", e);
-  }
-}
-
+// -----------------------------------------------------------------------------
+// 4. WebSocket Connection Engine (Manual Connect Button Control & NO Auto-Connect on Load)
+// -----------------------------------------------------------------------------
 function updateConnectionStatus(online) {
   isConnected = online;
   if (!connStatusBadge) return;
@@ -549,263 +545,161 @@ function updateConnectionStatus(online) {
     connStatusBadge.className = "conn-status-badge online";
     connStatusText.textContent = "Connected";
     btnConnect.className = "btn-create-room connected";
-    btnConnectText.textContent = "Connected";
+    btnConnectText.textContent = "Disconnect";
+    if (clientCountsBadge) clientCountsBadge.style.display = "inline-flex";
+    if (browserCount && (parseInt(browserCount.textContent || "0") < 1)) {
+      browserCount.textContent = "1";
+    }
   } else {
     connStatusBadge.className = "conn-status-badge offline";
     connStatusText.textContent = "Disconnected";
     btnConnect.className = "btn-create-room";
     btnConnectText.textContent = "Connect";
+    if (clientCountsBadge) clientCountsBadge.style.display = "none";
   }
 }
 
-async function connectToRoom(roomId) {
-  if (unsubscribe) unsubscribe();
+function connectToRoom(roomId) {
+  if (ws) {
+    try { ws.close(); } catch (e) {}
+  }
+
   currentRoomId = roomId;
   localStorage.setItem("ctrlv_room_id", roomId);
 
-  if (!firebaseConfig || !db) {
-    updateConnectionStatus(false);
-    return false;
-  }
-
   cachedImagePath = null;
-  cachedText = null;
-  cachedFetchedStatus = null;
   cachedPCSentText = null;
 
   loadAndDisplayCachedScreenshot();
 
-  const roomRef = doc(db, "room", roomId);
+  const relayUrl = "wss://ctrlv.onrender.com/ws";
+  const fullWsUrl = `${relayUrl}?room=${encodeURIComponent(roomId)}&client=browser`;
 
   try {
-    const snap = await getDoc(roomRef);
-    if (!snap.exists()) {
-      await setDoc(roomRef, {
-        fetched: false,
-        image_path: "",
-        uploaded_text: ""
-      });
-    }
+    ws = new WebSocket(fullWsUrl);
 
-    updateConnectionStatus(true);
+    ws.onopen = () => {
+      updateConnectionStatus(true);
+      console.log(`Connected to WebSocket Relay Room: ${roomId}`);
+    };
+
+    ws.onclose = () => {
+      updateConnectionStatus(false);
+    };
+
+    ws.onerror = (err) => {
+      console.error("WebSocket Error:", err);
+      updateConnectionStatus(false);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "room_stats") {
+          if (browserCount) browserCount.textContent = Math.max(1, msg.browsers || 0);
+          if (pcCount) pcCount.textContent = msg.clis || 0;
+        } else if (msg.type === "image" && msg.content) {
+          const newImg = msg.content;
+          if (newImg !== cachedImagePath) {
+            const isFirstLoad = (cachedImagePath === null);
+            cachedImagePath = newImg;
+            screenshotImg.src = newImg;
+            screenshotImg.style.display = "block";
+            emptyState.style.display = "none";
+            saveCachedScreenshot(newImg);
+
+            if (autoDownload && !isFirstLoad) {
+              downloadImage(newImg, `ctrlv-${currentRoomId}-${Date.now()}.png`);
+            }
+
+            if (autoSolveEnabled && !isFirstLoad) {
+              switchTab("screenshot");
+              const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
+              solveImageWithGemini(newImg, prompt);
+            }
+          }
+        } else if (msg.type === "text" && msg.content) {
+          const newText = msg.content;
+          if (newText !== cachedPCSentText) {
+            const isFirstLoad = (cachedPCSentText === null);
+            cachedPCSentText = newText;
+
+            if (pcSentTextDisplay) {
+              pcSentTextDisplay.textContent = newText;
+              pcSentTextDisplay.style.color = "var(--text-main)";
+            }
+
+            textInput.value = newText;
+
+            if (autoSolveEnabled && !isFirstLoad) {
+              switchTab("pctext");
+              const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
+              solveTextWithGemini(newText, prompt);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse WebSocket message:", e);
+      }
+    };
   } catch (err) {
-    console.warn("Initializing doc error:", err);
+    console.error("WebSocket Connection Error:", err);
     updateConnectionStatus(false);
-    return false;
   }
+}
 
-  unsubscribe = onSnapshot(roomRef, (snapshot) => {
-    if (snapshot.exists()) {
-      const data = snapshot.data();
+// Generate Random Room ID helper
+function generateRandomRoomId() {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let randomStr = "";
+  for (let i = 0; i < 6; i++) {
+    randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `ctrlv-${randomStr}`;
+}
 
-      // 1. Screenshot Update (Triggers Screenshot AI ONLY, does NOT trigger Text AI)
-      const newImg = data.image_path || "";
-      if (newImg !== cachedImagePath) {
-        const isFirstLoad = (cachedImagePath === null);
-        cachedImagePath = newImg;
-        if (newImg.trim() !== "") {
-          screenshotImg.src = newImg;
-          screenshotImg.style.display = "block";
-          emptyState.style.display = "none";
-
-          saveCachedScreenshot(newImg);
-
-          if (autoDownload && !isFirstLoad) {
-            downloadImage(newImg, `ctrlv-${currentRoomId}-${Date.now()}.png`);
-          }
-
-          if (autoSolveEnabled && !isFirstLoad) {
-            switchTab("screenshot");
-            const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
-            solveImageWithGemini(newImg, prompt);
-          }
-        } else if (!getCachedScreenshot()) {
-          screenshotImg.style.display = "none";
-          emptyState.style.display = "flex";
-        }
-      }
-
-      // 2. PC Question Text Update (Ctrl+Shift+T) (Triggers Text AI ONLY, does NOT trigger Screenshot AI)
-      const pcSentText = data.pc_sent_text || "";
-      if (pcSentText !== cachedPCSentText) {
-        const isFirstLoad = (cachedPCSentText === null);
-        cachedPCSentText = pcSentText;
-
-        if (pcSentTextDisplay) {
-          if (pcSentText.trim() !== "") {
-            pcSentTextDisplay.textContent = pcSentText;
-            pcSentTextDisplay.style.color = "var(--text-main)";
-          } else {
-            pcSentTextDisplay.textContent = "No question text received yet. Press Ctrl+Shift+T on PC to send clipboard text here.";
-            pcSentTextDisplay.style.color = "var(--text-muted)";
-          }
-        }
-
-        // Auto-solve text question ONLY if Auto-Solve is enabled & switch tab to PC text!
-        if (autoSolveEnabled && !isFirstLoad && pcSentText.trim() !== "") {
-          switchTab("pctext");
-          const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
-          solveTextWithGemini(pcSentText, prompt);
-        }
-      }
-
-      // 3. Text Field Update (Strip /---/ signature for UI display)
-      let rawText = data.uploaded_text || "";
-      if (rawText.endsWith("\n/---/")) {
-        rawText = rawText.slice(0, -6);
-      } else if (rawText.endsWith("/---/")) {
-        rawText = rawText.slice(0, -5);
-      }
-
-      if (rawText !== cachedText) {
-        cachedText = rawText;
-        if (document.activeElement !== textInput) {
-          textInput.value = rawText;
-        }
-      }
-
-      // 4. Status Pill Update
-      const isFetched = data.fetched === true;
-      if (isFetched !== cachedFetchedStatus) {
-        cachedFetchedStatus = isFetched;
-        if (isFetched) {
-          statusBadge.className = "status-pill seen";
-          statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> <span>Seen / Copied to PC</span>`;
-        } else {
-          statusBadge.className = "status-pill pending";
-          statusBadge.innerHTML = `<i class="fa-solid fa-clock"></i> <span>Pending (Press Ctrl+Shift+F)</span>`;
-        }
-      }
+if (btnGenRandomRoom) {
+  btnGenRandomRoom.addEventListener("click", () => {
+    const newRoom = generateRandomRoomId();
+    if (roomIdInput) roomIdInput.value = newRoom;
+    if (isConnected) {
+      connectToRoom(newRoom);
     }
-  }, (error) => {
-    console.error("Firestore listener error:", error);
+  });
+}
+
+// Connect / Disconnect Toggle Button
+btnConnect.addEventListener("click", () => {
+  if (isConnected) {
+    if (ws) {
+      try { ws.close(); } catch (e) {}
+    }
     updateConnectionStatus(false);
-  });
-
-  return true;
-}
-
-// Event Listeners
-if (btnConnect) {
-  btnConnect.addEventListener("click", () => {
-    const rid = roomIdInput.value.trim();
-    if (rid) {
-      if (isConnected && rid === currentRoomId) {
-        if (unsubscribe) unsubscribe();
-        updateConnectionStatus(false);
-      } else {
-        connectToRoom(rid);
-      }
+  } else {
+    const room = roomIdInput ? roomIdInput.value.trim() : "";
+    if (room) {
+      connectToRoom(room);
     }
+  }
+});
+
+btnSendText.addEventListener("click", () => {
+  const content = textInput.value.trim();
+  if (!content) return;
+  sendTextToRelay(content);
+});
+
+btnCopyRoom.addEventListener("click", () => {
+  const room = roomIdInput ? roomIdInput.value.trim() : "ctrlv-a8f3b2";
+  const cmd = `ctrlv -r ${room} -s`;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const originalText = btnCopyRoom.innerHTML;
+    btnCopyRoom.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+    setTimeout(() => {
+      btnCopyRoom.innerHTML = originalText;
+    }, 2000);
   });
-}
-
-if (roomIdInput) {
-  roomIdInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-      const rid = roomIdInput.value.trim();
-      if (rid) connectToRoom(rid);
-    }
-  });
-}
-
-if (btnSendText) {
-  btnSendText.addEventListener("click", async () => {
-    const text = textInput.value.trim();
-    if (!text) return;
-    if (!db || !currentRoomId) {
-      alert("Please connect to a room first.");
-      return;
-    }
-
-    try {
-      const formattedText = text + "\n/---/";
-      const roomRef = doc(db, "room", currentRoomId);
-      await setDoc(roomRef, {
-        uploaded_text: formattedText,
-        fetched: false
-      }, { merge: true });
-
-      saveToHistory(currentRoomId, text);
-      btnSendTextLabel.textContent = "Sent!";
-      setTimeout(() => {
-        btnSendTextLabel.textContent = "Send to PC";
-      }, 2000);
-    } catch (err) {
-      console.error("Send text error:", err);
-      alert("Failed to send text to PC: " + err.message);
-    }
-  });
-}
-
-if (btnCopyRoom) {
-  btnCopyRoom.addEventListener("click", () => {
-    const cmd = `ctrlv -r ${currentRoomId}`;
-    navigator.clipboard.writeText(cmd).then(() => {
-      const copyBtnText = document.getElementById("copyBtnText");
-      if (copyBtnText) copyBtnText.textContent = "Copied!";
-      setTimeout(() => {
-        if (copyBtnText) copyBtnText.textContent = "Copy CLI Command";
-      }, 2000);
-    });
-  });
-}
-
-// Fetch Screenshot button: DOES NOT INVOKE AI!
-if (btnFetchScreenshot) {
-  btnFetchScreenshot.addEventListener("click", async () => {
-    if (!db || !currentRoomId) return;
-    fetchImgLabel.textContent = "Fetching...";
-    try {
-      const roomRef = doc(db, "room", currentRoomId);
-      const snap = await getDoc(roomRef);
-      if (snap.exists() && snap.data().image_path) {
-        const b64 = snap.data().image_path;
-        screenshotImg.src = b64;
-        screenshotImg.style.display = "block";
-        emptyState.style.display = "none";
-        saveCachedScreenshot(b64);
-      }
-    } catch (err) {
-      console.error("Fetch screenshot error:", err);
-    } finally {
-      fetchImgLabel.textContent = "Fetch";
-    }
-  });
-}
-
-// Fetch PC Text button: DOES NOT INVOKE AI!
-if (btnFetchPCText) {
-  btnFetchPCText.addEventListener("click", async () => {
-    if (!db || !currentRoomId) return;
-    fetchTextLabel.textContent = "Fetching...";
-    try {
-      const roomRef = doc(db, "room", currentRoomId);
-      const snap = await getDoc(roomRef);
-      if (snap.exists() && snap.data().pc_sent_text) {
-        const text = snap.data().pc_sent_text;
-        if (pcSentTextDisplay) {
-          pcSentTextDisplay.textContent = text;
-          pcSentTextDisplay.style.color = "var(--text-main)";
-        }
-      }
-    } catch (err) {
-      console.error("Fetch PC text error:", err);
-    } finally {
-      fetchTextLabel.textContent = "Fetch Text";
-    }
-  });
-}
-
-if (btnDownloadImg) {
-  btnDownloadImg.addEventListener("click", () => {
-    if (screenshotImg.src && screenshotImg.style.display !== "none") {
-      downloadImage(screenshotImg.src, `ctrlv-${currentRoomId}-${Date.now()}.png`);
-    } else {
-      alert("No screenshot available to download.");
-    }
-  });
-}
+});
 
 function downloadImage(dataUrl, filename) {
   const a = document.createElement("a");
@@ -814,6 +708,14 @@ function downloadImage(dataUrl, filename) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+if (btnDownloadImg) {
+  btnDownloadImg.addEventListener("click", () => {
+    if (screenshotImg.src && screenshotImg.style.display !== "none") {
+      downloadImage(screenshotImg.src, `ctrlv-${currentRoomId}-${Date.now()}.png`);
+    }
+  });
 }
 
 if (screenshotImg) {
@@ -829,21 +731,99 @@ if (btnCloseModal) {
   });
 }
 
-if (imageModal) {
-  imageModal.addEventListener("click", (e) => {
-    if (e.target === imageModal) {
-      imageModal.style.display = "none";
-    }
+// -----------------------------------------------------------------------------
+// 5. CLI Downloads Panel Script logic (Windows/Linux/macOS + Arch Pill Handlers)
+// -----------------------------------------------------------------------------
+const osBtns = document.querySelectorAll(".dl-os-btn");
+const archBtns = document.querySelectorAll(".dl-arch-pill");
+const panels = {
+  windows: document.getElementById("panelWindows"),
+  linux: document.getElementById("panelLinux"),
+  mac: document.getElementById("panelMac")
+};
+
+let currentOs = "windows";
+let currentArch = "amd64";
+
+function updateDlContent() {
+  if (!panels.windows) return;
+  Object.keys(panels).forEach(os => {
+    if (panels[os]) panels[os].style.display = (os === currentOs) ? "block" : "none";
   });
+
+  osBtns.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.os === currentOs);
+  });
+
+  archBtns.forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.arch === currentArch);
+  });
+
+  const archLabel = (currentArch === "amd64") ? "x64" : "ARM64";
+
+  const winZipUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_${currentArch}.zip`;
+  const elPs = document.getElementById("winPsCmd");
+  if (elPs) elPs.textContent = `Invoke-WebRequest -Uri ${winZipUrl} -OutFile ctrlv.zip; Expand-Archive ctrlv.zip -DestinationPath C:\\ctrlv`;
+  const elZipLink = document.getElementById("winZipLink");
+  if (elZipLink) elZipLink.href = winZipUrl;
+  const elZipText = document.getElementById("winZipBtnText");
+  if (elZipText) elZipText.textContent = `Download Portable ZIP (${archLabel})`;
+
+  const linuxDebUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_${currentArch}.deb`;
+  const linuxRpmUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_${currentArch}.rpm`;
+  const elApt = document.getElementById("linuxAptCmd");
+  if (elApt) elApt.textContent = `wget ${linuxDebUrl} && sudo apt install ./ctrlv-cli_linux_${currentArch}.deb`;
+  const elDebLink = document.getElementById("linuxDebLink");
+  if (elDebLink) elDebLink.href = linuxDebUrl;
+  const elDebText = document.getElementById("linuxDebBtnText");
+  if (elDebText) elDebText.textContent = `Download .deb (${archLabel})`;
+  const elRpmLink = document.getElementById("linuxRpmLink");
+  if (elRpmLink) elRpmLink.href = linuxRpmUrl;
+  const elRpmText = document.getElementById("linuxRpmBtnText");
+  if (elRpmText) elRpmText.textContent = `Download .rpm (${archLabel})`;
+
+  const macTarUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_${currentArch}.tar.gz`;
+  const macLabel = (currentArch === "amd64") ? "Intel" : "Apple Silicon";
+  const elCurl = document.getElementById("macCurlCmd");
+  if (elCurl) elCurl.textContent = `curl -sSfL ${macTarUrl} | tar -xz && sudo mv ctrlv /usr/local/bin/`;
+  const elTarLink = document.getElementById("macTarLink");
+  if (elTarLink) elTarLink.href = macTarUrl;
+  const elTarText = document.getElementById("macTarBtnText");
+  if (elTarText) elTarText.textContent = `Download tar.gz (${macLabel})`;
 }
 
-if (btnOpenHistory) {
-  btnOpenHistory.addEventListener("click", () => {
-    window.location.href = `history.html?room=${encodeURIComponent(currentRoomId)}`;
+osBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentOs = btn.dataset.os;
+    updateDlContent();
   });
-}
+});
 
-// Initial Auto-Connect on page load
-if (firebaseConfig && db && currentRoomId) {
-  connectToRoom(currentRoomId);
-}
+archBtns.forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentArch = btn.dataset.arch;
+    updateDlContent();
+  });
+});
+
+document.querySelectorAll(".btn-code-copy").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const targetId = btn.dataset.target;
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(() => {
+      const originalText = btn.innerHTML;
+      btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+      btn.style.background = "#10b981";
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = "";
+      }, 2000);
+    });
+  });
+});
+
+updateDlContent();
+
+// NOTE: DO NOT auto-connect on load! Status stays Disconnected until user clicks Connect.
+updateConnectionStatus(false);

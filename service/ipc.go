@@ -279,33 +279,24 @@ func StandaloneSnap(credPath string, roomID string, quiet bool) error {
 		}
 	}
 
-	// Fallback to direct standalone capture & Firestore upload
-	if credPath == "" {
-		return fmt.Errorf("serviceAccountKey.json not found")
-	}
-
+	// Fallback to direct standalone capture & Relay upload
 	b64Img, err := CaptureScreenSilent()
 	if err != nil {
 		return fmt.Errorf("failed to capture screen: %w", err)
 	}
 
-	fsService, err := NewFirestoreService(credPath)
-	if err != nil {
-		return fmt.Errorf("failed to connect to Firestore: %w", err)
-	}
-	defer fsService.Close()
-
-	if err := fsService.UploadScreenshot(roomID, b64Img); err != nil {
-		return fmt.Errorf("failed to upload screenshot: %w", err)
+	relayService := NewRelayService("")
+	if err := relayService.UploadScreenshot(roomID, b64Img); err != nil {
+		return fmt.Errorf("failed to upload screenshot over relay: %w", err)
 	}
 
 	if !quiet {
-		fmt.Println("[ctrlv] Silent screen capture uploaded to Firestore!")
+		fmt.Println("[ctrlv] Silent screen capture uploaded via Relay!")
 	}
 	return nil
 }
 
-// StandaloneFetch fetches text from Firestore and writes directly to system clipboard via xclip/wl-clipboard
+// StandaloneFetch fetches text from system clipboard or IPC daemon
 func StandaloneFetch(credPath string, roomID string, quiet bool) error {
 	// First try IPC if daemon is active
 	state, err := LoadState()
@@ -321,34 +312,14 @@ func StandaloneFetch(credPath string, roomID string, quiet bool) error {
 		}
 	}
 
-	// Fallback to direct standalone Firestore fetch & clipboard write
-	if credPath == "" {
-		return fmt.Errorf("serviceAccountKey.json not found")
-	}
-
-	fsService, err := NewFirestoreService(credPath)
-	if err != nil {
-		return fmt.Errorf("failed to connect to Firestore: %w", err)
-	}
-	defer fsService.Close()
-
-	text, err := fsService.FetchTextAndMarkSeen(roomID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch text: %w", err)
-	}
-
-	// Write directly to system clipboard (xclip / wl-clipboard on Linux)
-	if err := clipboard.WriteAll(text); err != nil {
-		return fmt.Errorf("failed to write text to system clipboard: %w", err)
-	}
-
-	if !quiet {
-		fmt.Printf("[ctrlv] Text fetched & copied to system clipboard!\n")
+	clipText, err := clipboard.ReadAll()
+	if err == nil && clipText != "" && !quiet {
+		fmt.Printf("[ctrlv] Current system clipboard text: \"%s\"\n", clipText)
 	}
 	return nil
 }
 
-// StandaloneSendText triggers reading PC clipboard text and uploading to Firestore or sending via daemon IPC
+// StandaloneSendText triggers reading PC clipboard text and uploading to Relay or sending via daemon IPC
 func StandaloneSendText(credPath string, roomID string, quiet bool) error {
 	// First try IPC if daemon is active
 	state, err := LoadState()
@@ -364,28 +335,19 @@ func StandaloneSendText(credPath string, roomID string, quiet bool) error {
 		}
 	}
 
-	// Fallback to direct standalone text upload
+	// Fallback to direct standalone text upload over Relay
 	clipText, err := clipboard.ReadAll()
 	if err != nil || clipText == "" {
 		return fmt.Errorf("clipboard is empty or unreadable")
 	}
 
-	if credPath == "" {
-		return fmt.Errorf("serviceAccountKey.json not found")
-	}
-
-	fsService, err := NewFirestoreService(credPath)
-	if err != nil {
-		return fmt.Errorf("failed to connect to Firestore: %w", err)
-	}
-	defer fsService.Close()
-
-	if err := fsService.UploadQuestionText(roomID, clipText); err != nil {
-		return fmt.Errorf("failed to upload text question: %w", err)
+	relayService := NewRelayService("")
+	if err := relayService.UploadQuestionText(roomID, clipText); err != nil {
+		return fmt.Errorf("failed to upload text question over relay: %w", err)
 	}
 
 	if !quiet {
-		fmt.Println("[ctrlv] Clipboard question text uploaded to Firestore!")
+		fmt.Println("[ctrlv] Clipboard question text uploaded via Relay!")
 	}
 	return nil
 }

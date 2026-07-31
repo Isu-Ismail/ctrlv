@@ -1,39 +1,4 @@
-// Helper module for reading/writing dynamic Firebase & Multi-Provider AI configurations
-export function getFirebaseConfig() {
-  try {
-    const stored = localStorage.getItem("ctrlv_firebase_config");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      const projId = parsed.projectId || parsed.project_id;
-      if (projId && projId.trim() !== "") {
-        return {
-          projectId: projId.trim(),
-          clientEmail: (parsed.clientEmail || parsed.client_email || "").trim(),
-          authDomain: parsed.authDomain || `${projId.trim()}.firebaseapp.com`
-        };
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to parse custom firebase config:", e);
-  }
-
-  // Returns null if user has not set Project ID & Client Email
-  return null;
-}
-
-export function saveFirebaseConfig(projId, clientEmail) {
-  const config = {
-    projectId: (projId || "").trim(),
-    clientEmail: (clientEmail || "").trim()
-  };
-  localStorage.setItem("ctrlv_firebase_config", JSON.stringify(config));
-}
-
-export function clearFirebaseConfig() {
-  localStorage.removeItem("ctrlv_firebase_config");
-}
-
-// AI Multi-Provider Config Helpers
+// Helper module for reading/writing Multi-Provider AI configurations
 export function getAIConfig() {
   try {
     const stored = localStorage.getItem("ctrlv_ai_config");
