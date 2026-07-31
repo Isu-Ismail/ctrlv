@@ -22,6 +22,7 @@ type RelayService struct {
 	ServerURL string
 	conn      *websocket.Conn
 	mu        sync.Mutex
+	writeMu   sync.Mutex
 }
 
 const DefaultRelayURL = "wss://ctrlv.onrender.com/ws"
@@ -49,6 +50,7 @@ func (rs *RelayService) Connect(roomID string) (*websocket.Conn, error) {
 
 	if rs.conn != nil {
 		_ = rs.conn.Close()
+		rs.conn = nil
 	}
 
 	u, err := url.Parse(rs.ServerURL)
@@ -100,7 +102,7 @@ func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, on
 			continue
 		}
 
-		log.Printf("[Relay] Connected to WebSocket room: %s", roomID)
+		log.Printf("[Relay] Persistent CLI socket active for room: %s", roomID)
 
 		for {
 			var msg RelayMessage
@@ -122,52 +124,57 @@ func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, on
 	}
 }
 
-func (rs *RelayService) UploadScreenshot(roomID string, base64Image string) error {
-	conn, err := rs.Connect(roomID)
+// SendMessage sends a payload over the active persistent socket, or opens a temporary one for one-shot commands
+func (rs *RelayService) SendMessage(roomID string, msgType string, content string) error {
+	rs.mu.Lock()
+	activeConn := rs.conn
+	rs.mu.Unlock()
+
+	msg := RelayMessage{
+		Type:    msgType,
+		RoomID:  roomID,
+		Content: content,
+	}
+
+	// 1. If persistent daemon socket is connected, write over it directly! (No duplicate socket!)
+	if activeConn != nil {
+		rs.writeMu.Lock()
+		err := activeConn.WriteJSON(msg)
+		rs.writeMu.Unlock()
+		if err == nil {
+			log.Printf("[Relay] Pushed %s via persistent socket to room: %s (%d KB)", msgType, roomID, len(content)/1024)
+			return nil
+		}
+		log.Printf("[Relay Warning] Write to active socket failed: %v. Reconnecting...", err)
+	}
+
+	// 2. Fallback for one-shot CLI commands (ctrlv snap -r room)
+	tempConn, err := rs.Connect(roomID)
 	if err != nil {
 		return err
 	}
 	defer func() {
 		time.Sleep(250 * time.Millisecond)
-		_ = conn.Close()
+		_ = tempConn.Close()
 	}()
 
-	msg := RelayMessage{
-		Type:    "image",
-		RoomID:  roomID,
-		Content: base64Image,
+	rs.writeMu.Lock()
+	err = tempConn.WriteJSON(msg)
+	rs.writeMu.Unlock()
+	if err != nil {
+		return fmt.Errorf("failed to send %s over relay: %w", msgType, err)
 	}
 
-	if err := conn.WriteJSON(msg); err != nil {
-		return fmt.Errorf("failed to send screenshot over relay: %w", err)
-	}
-
-	log.Printf("[Relay] Screenshot uploaded successfully to room: %s (%d KB)", roomID, len(base64Image)/1024)
+	log.Printf("[Relay] Pushed %s via one-shot connection to room: %s (%d KB)", msgType, roomID, len(content)/1024)
 	return nil
 }
 
+func (rs *RelayService) UploadScreenshot(roomID string, base64Image string) error {
+	return rs.SendMessage(roomID, "image", base64Image)
+}
+
 func (rs *RelayService) UploadQuestionText(roomID string, text string) error {
-	conn, err := rs.Connect(roomID)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		time.Sleep(150 * time.Millisecond)
-		_ = conn.Close()
-	}()
-
-	msg := RelayMessage{
-		Type:    "text",
-		RoomID:  roomID,
-		Content: text,
-	}
-
-	if err := conn.WriteJSON(msg); err != nil {
-		return fmt.Errorf("failed to send text over relay: %w", err)
-	}
-
-	log.Printf("[Relay] Question text uploaded successfully to room: %s", roomID)
-	return nil
+	return rs.SendMessage(roomID, "text", text)
 }
 
 func (rs *RelayService) Close() {
