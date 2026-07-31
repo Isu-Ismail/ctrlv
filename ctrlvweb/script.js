@@ -243,8 +243,6 @@ async function solveImageWithGemini(b64ImageData, promptText) {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${cleanApiKey}`,
-          "HTTP-Referer": "https://ctrlv.sync",
-          "X-Title": "ctrlv Web AI Solver",
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -390,8 +388,6 @@ async function solveTextWithGemini(questionText, promptText) {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${cleanApiKey}`,
-          "HTTP-Referer": "https://ctrlv.sync",
-          "X-Title": "ctrlv Web AI Solver",
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
