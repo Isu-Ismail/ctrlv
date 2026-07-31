@@ -6,17 +6,18 @@
   gap: 1.25rem;
   width: 100%;
   flex: 1;
-  min-height: calc(100vh - 160px);
+  min-height: 0;
   align-items: stretch;
 }
 
-/* Equal Height Flexible Columns */
+/* Symmetrical Flexible Columns */
 .dashboard-col {
   display: flex;
   flex-direction: column;
-  flex: 1;
   height: 100%;
-  gap: 1rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow: hidden;
 }
 
 /* Screenshot & PC Text Display Containers */
@@ -25,8 +26,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 380px;
   flex: 1;
+  min-height: 260px;
+  height: 100%;
   background: var(--bg-tertiary);
   border: 1px dashed var(--card-border);
   border-radius: var(--radius-md);
@@ -45,42 +47,43 @@
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
-  padding: 2.5rem 1.5rem;
+  padding: 1rem;
   text-align: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .empty-state-icon {
-  font-size: 3rem;
+  font-size: 2.2rem;
   color: var(--accent-primary);
   opacity: 0.7;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .empty-state-title {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--text-main);
 }
 
 .empty-state-subtitle {
-  font-size: 0.83rem;
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 
 .empty-state-kbd {
   background: var(--bg-input);
   border: 1px solid var(--card-border);
-  padding: 0.15rem 0.45rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--accent-cyan);
 }
 
 .screenshot-display-img {
   width: 100%;
   height: 100%;
+  max-height: 100%;
   object-fit: contain;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -90,58 +93,45 @@
   transform: scale(1.005);
 }
 
-/* PC Sent Question Display Box */
-.pc-text-box {
-  min-height: 380px;
-  flex: 1;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.pc-text-content {
-  font-family: var(--font-mono);
-  font-size: 0.88rem;
-  color: var(--text-main);
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.6;
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.75rem;
-  background: var(--bg-input);
-  border-radius: var(--radius-sm);
-}
-
-/* Code & AI Snippet Box */
+/* Unified Code & AI Snippet Editor Area */
 .code-editor-area {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 320px;
-  gap: 0.5rem;
+  min-height: 260px;
+  height: 100%;
+  gap: 0.4rem;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .code-textarea {
   width: 100%;
   height: 100%;
-  min-height: 300px;
+  min-height: 0;
   flex: 1;
-  resize: vertical;
+  resize: none; /* Fixed within box */
   font-family: var(--font-mono);
-  font-size: 0.88rem;
-  line-height: 1.5;
-  padding: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  padding: 0.75rem 0.85rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--card-border);
-  background: var(--bg-input);
-  color: var(--text-main);
+  background: var(--code-bg);
+  color: var(--code-text);
   outline: none;
+  overflow-y: auto;
+  box-sizing: border-box;
   transition: var(--transition-fast);
+}
+
+.code-textarea::placeholder {
+  color: var(--text-dim);
+  opacity: 0.75;
+}
+
+.code-textarea:hover {
+  border-color: var(--card-border-hover);
 }
 
 .code-textarea:focus {
@@ -153,15 +143,10 @@
 @media (max-width: 900px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
-    min-height: auto;
   }
 
-  .sync-media-viewer, .pc-text-box {
-    min-height: 280px;
-    max-height: 460px;
-  }
-
-  .code-textarea {
-    min-height: 220px;
+  .sync-media-viewer, .code-editor-area {
+    height: 250px;
+    min-height: 250px;
   }
 }
