@@ -183,6 +183,25 @@ func (rs *RelayService) UploadQuestionText(roomID string, text string) error {
 	return rs.SendMessage(roomID, "exe_web", text)
 }
 
+func (rs *RelayService) FetchLatestWebText(roomID string) (string, error) {
+	conn, err := rs.Connect(roomID)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	for {
+		var msg RelayMessage
+		if err := conn.ReadJSON(&msg); err != nil {
+			return "", err
+		}
+		if (msg.Type == "web_exe" || msg.Type == "text") && strings.TrimSpace(msg.Content) != "" {
+			return msg.Content, nil
+		}
+	}
+}
+
 func (rs *RelayService) Close() {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()

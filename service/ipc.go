@@ -469,3 +469,19 @@ func RequestStop() {
 	}
 	fmt.Printf("ctrlv stop: Background daemon (PID %d, Mode: %s) stopped successfully.\n", state.PID, modeStr)
 }
+
+// TriggerFetchIPC sends an IPC HTTP request to the running daemon to execute fetch
+func TriggerFetchIPC() error {
+	state, err := LoadState()
+	if err != nil {
+		return fmt.Errorf("no background service running")
+	}
+
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:"+state.Port+"/fetch", "application/json", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}

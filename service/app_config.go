@@ -11,10 +11,11 @@ import (
 )
 
 type AppConfig struct {
-	APIKey   string `json:"api_key"`
-	Model    string `json:"model"`
-	RelayURL string `json:"relay_url"`
-	Editor   string `json:"editor"`
+	APIKey       string `json:"api_key"`
+	Model        string `json:"model"`
+	CustomPrompt string `json:"custom_prompt,omitempty"`
+	RelayURL     string `json:"relay_url"`
+	Editor       string `json:"editor,omitempty"`
 }
 
 func GetConfigPath() string {
@@ -31,10 +32,11 @@ func EnsureConfigExists() (string, *AppConfig, error) {
 	configPath := GetConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		defaultCfg := &AppConfig{
-			APIKey:   "",
-			Model:    "openrouter/auto",
-			RelayURL: "wss://ctrlv.onrender.com/ws",
-			Editor:   "",
+			APIKey:       "",
+			Model:        "openrouter/auto",
+			CustomPrompt: "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
+			RelayURL:     "wss://ctrlv.onrender.com/ws",
+			Editor:       "",
 		}
 		if err := SaveAppConfig(defaultCfg); err != nil {
 			return configPath, defaultCfg, fmt.Errorf("failed to create default config at %s: %w", configPath, err)
@@ -64,6 +66,9 @@ func LoadAppConfig() (*AppConfig, error) {
 	if cfg.Model == "" {
 		cfg.Model = "openrouter/auto"
 	}
+	if strings.TrimSpace(cfg.CustomPrompt) == "" {
+		cfg.CustomPrompt = "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting."
+	}
 
 	return &cfg, nil
 }
@@ -78,11 +83,15 @@ func SaveAppConfig(cfg *AppConfig) error {
 }
 
 func (c *AppConfig) ToAIConfig() *AIConfig {
+	prompt := strings.TrimSpace(c.CustomPrompt)
+	if prompt == "" {
+		prompt = "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting."
+	}
 	return &AIConfig{
 		Provider:     "openrouter",
 		APIKey:       c.APIKey,
 		Model:        c.Model,
-		CustomPrompt: "Solve the coding question or problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
+		CustomPrompt: prompt,
 		CodeOnly:     true,
 	}
 }

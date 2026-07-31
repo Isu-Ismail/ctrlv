@@ -429,7 +429,7 @@ async function solveImageWithGemini(b64ImageData, promptText) {
 
     textInput.value = generatedText;
     sendTextToRelay(generatedText);
-    updateAISolverStatus("success", "Solved Screenshot & Pushed to PC!");
+    updateAISolverStatus("success", "Text Received & Pushed to PC!");
   } catch (err) {
     console.error("AI Solver error:", err);
     updateAISolverStatus("error", err.message || "Failed to solve with AI");
@@ -533,7 +533,7 @@ async function solveTextWithGemini(questionText, promptText) {
 
     textInput.value = generatedText;
     sendTextToRelay(generatedText);
-    updateAISolverStatus("success", "Text Solved & Pushed to PC!");
+    updateAISolverStatus("success", "Text Received & Pushed to PC!");
   } catch (err) {
     console.error("AI Text Solver error:", err);
     updateAISolverStatus("error", err.message || "AI Solving failed");
@@ -782,9 +782,17 @@ btnConnect.addEventListener("click", () => {
 });
 
 btnSendText.addEventListener("click", () => {
-  const content = textInput.value.trim();
+  const content = textInput ? textInput.value.trim() : "";
   if (!content) return;
   sendTextToRelay(content);
+
+  const originalHTML = btnSendText.innerHTML;
+  btnSendText.innerHTML = `<i class="fa-solid fa-check"></i> Sent!`;
+  btnSendText.style.background = "var(--accent-green)";
+  setTimeout(() => {
+    btnSendText.innerHTML = originalHTML;
+    btnSendText.style.background = "";
+  }, 1800);
 });
 
 btnCopyRoom.addEventListener("click", () => {

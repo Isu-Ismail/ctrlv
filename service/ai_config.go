@@ -46,6 +46,9 @@ func SaveAIConfig(cfg *AIConfig) error {
 	if cfg.Model != "" {
 		appCfg.Model = cfg.Model
 	}
+	if cfg.CustomPrompt != "" {
+		appCfg.CustomPrompt = cfg.CustomPrompt
+	}
 	return SaveAppConfig(appCfg)
 }
 

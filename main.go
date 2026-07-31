@@ -128,9 +128,23 @@ func main() {
 			return
 		case "fetch":
 			quiet := hasQuietFlag(args[1:])
-			clipText, err := clipboard.ReadAll()
-			if err == nil && clipText != "" && !quiet {
-				fmt.Printf("[Clipboard] Current text on system clipboard: \"%s\"\n", clipText)
+			if err := service.TriggerFetchIPC(); err != nil {
+				// Fallback if daemon is not running: fetch directly from relay server
+				roomID := resolveActiveRoomID(args[1:], *roomFlag)
+				relayService := service.NewRelayService("")
+				text, err := relayService.FetchLatestWebText(roomID)
+				if err == nil && text != "" {
+					_ = clipboard.WriteAll(text)
+					if !quiet {
+						fmt.Printf("[SUCCESS] Fetched AI solution and updated PC clipboard: \"%s\"\n", text)
+					}
+					return
+				}
+				if !quiet {
+					fmt.Println("[Error] Could not fetch AI solution from relay server!")
+				}
+			} else if !quiet {
+				fmt.Println("[SUCCESS] Triggered fetch & updated PC system clipboard with AI solution!")
 			}
 			return
 		case "logs":
@@ -499,7 +513,7 @@ func runDaemon(roomID string, wantScreen bool) {
 
 			if wantScreen {
 				service.UpdateOverlayText(cleanText)
-				service.UpdateOverlayStatus("AI Solution Received & Copied to Clipboard!")
+				service.UpdateOverlayStatus("Text Received & Copied to Clipboard!")
 			}
 		}
 	})
@@ -507,7 +521,7 @@ func runDaemon(roomID string, wantScreen bool) {
 	// Callback for Screenshot (Ctrl + Shift + S)
 	onScreenshot := func() {
 		if wantScreen {
-			service.UpdateOverlayStatus("Capturing & Uploading Screenshot...")
+			service.UpdateOverlayStatus("Capturing & Sending Screenshot...")
 		}
 		b64Img, err := service.CaptureScreenSilent()
 		if err != nil {
@@ -524,7 +538,7 @@ func runDaemon(roomID string, wantScreen bool) {
 			}
 		} else {
 			if wantScreen {
-				service.UpdateOverlayStatus("Screenshot Sent Successfully via Relay!")
+				service.UpdateOverlayStatus("Screenshot Sent to Web!")
 			}
 		}
 	}
@@ -537,7 +551,20 @@ func runDaemon(roomID string, wantScreen bool) {
 
 		if text == "" {
 			if wantScreen {
-				service.UpdateOverlayStatus("No AI Solution Available Yet!")
+				service.UpdateOverlayStatus("Querying Relay for Web Text...")
+			}
+			fetched, err := relayService.FetchLatestWebText(roomID)
+			if err == nil && fetched != "" {
+				text = fetched
+				latestWebTextMu.Lock()
+				latestWebText = fetched
+				latestWebTextMu.Unlock()
+			}
+		}
+
+		if text == "" {
+			if wantScreen {
+				service.UpdateOverlayStatus("No Web Text Available Yet!")
 			}
 			return
 		}
@@ -545,18 +572,18 @@ func runDaemon(roomID string, wantScreen bool) {
 		if err := clipboard.WriteAll(text); err != nil {
 			log.Printf("[Clipboard Write Error] %v", err)
 		} else {
-			log.Printf("[Fetch Text] Re-copied AI text to PC clipboard: \"%s\"", text)
+			log.Printf("[Fetch Text] Copied web text to PC clipboard: \"%s\"", text)
 		}
 
 		if wantScreen {
 			service.UpdateOverlayText(text)
-			service.UpdateOverlayStatus("Fetched AI Solution & Copied!")
+			service.UpdateOverlayStatus("Fetched Web Text & Copied!")
 		}
 	}
 
 	// Callback for Send Clipboard Text Question (Ctrl + Shift + T)
 	onSendText := func() {
-		log.Println("[Daemon] Reading PC clipboard text question...")
+		log.Println("[Daemon] Reading PC clipboard text...")
 		if wantScreen {
 			service.UpdateOverlayStatus("Reading PC Clipboard Text...")
 		}
@@ -571,14 +598,14 @@ func runDaemon(roomID string, wantScreen bool) {
 		}
 
 		if err := relayService.UploadQuestionText(roomID, clipText); err != nil {
-			log.Printf("[Upload Error] Failed to upload question text: %v", err)
+			log.Printf("[Upload Error] Failed to upload text: %v", err)
 			if wantScreen {
 				service.UpdateOverlayStatus("Failed to Upload Text!")
 			}
 		} else {
-			log.Printf("[Relay] Uploaded PC clipboard text question: \"%s\"", clipText)
+			log.Printf("[Relay] Uploaded PC clipboard text: \"%s\"", clipText)
 			if wantScreen {
-				service.UpdateOverlayStatus("Question Sent to Web!")
+				service.UpdateOverlayStatus("Sent Text to Web!")
 			}
 		}
 	}
