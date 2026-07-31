@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -49,9 +50,27 @@ func main() {
 
 	args := flag.Args()
 
+	// Ensure ctrlv_config.json is auto-created on ANY command run
+	_, _, _ = service.EnsureConfigExists()
+
 	// Check if subcommands were passed
 	if len(args) > 0 {
 		switch args[0] {
+		case "config":
+			editorFlag := ""
+			for i, a := range args[1:] {
+				if (a == "-e" || a == "--editor") && i+1 < len(args[1:]) {
+					editorFlag = args[1:][i+1]
+				} else if strings.HasPrefix(a, "-e=") {
+					editorFlag = strings.TrimPrefix(a, "-e=")
+				} else if strings.HasPrefix(a, "--editor=") {
+					editorFlag = strings.TrimPrefix(a, "--editor=")
+				}
+			}
+			if err := service.OpenConfigInEditor(editorFlag); err != nil {
+				fmt.Printf("[Error] Failed to open config editor: %v\n", err)
+			}
+			return
 		case "setup":
 			service.RunSetup()
 			return
@@ -112,7 +131,7 @@ func main() {
 	}
 
 	roomID := *roomFlag
-	if roomID == "" && len(args) > 0 && args[0] != "setup" && args[0] != "status" && args[0] != "stop" && args[0] != "logs" && args[0] != "snap" && args[0] != "text" && args[0] != "fetch" && args[0] != "standalone" {
+	if roomID == "" && len(args) > 0 && args[0] != "config" && args[0] != "setup" && args[0] != "status" && args[0] != "stop" && args[0] != "logs" && args[0] != "snap" && args[0] != "text" && args[0] != "fetch" && args[0] != "standalone" {
 		roomID = args[0]
 	}
 
@@ -585,6 +604,8 @@ func printUsage() {
 	fmt.Println("ctrlv - Realtime Cross-Device Screenshot & Clipboard Sync CLI")
 	fmt.Println()
 	fmt.Println("Usage:")
+	fmt.Println("  ctrlv config             Open ctrlv_config.json in text editor (notepad/nano/saved editor)")
+	fmt.Println("  ctrlv config -e <editor>  Set preferred editor (e.g. code, notepad, nano) & open config")
 	fmt.Println("  ctrlv standalone        Run Direct AI mode (Zero Firebase needed! Direct 1-second AI solve)")
 	fmt.Println("  ctrlv standalone -s     Run Direct AI mode + Screen-Share Invisible Overlay Notepad")
 	fmt.Println("  ctrlv -r <roomid>       Start Firebase room sync background service")

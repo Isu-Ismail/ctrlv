@@ -7,8 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -22,56 +20,33 @@ type AIConfig struct {
 }
 
 func GetAIConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	ctrlvDir := filepath.Join(home, ".ctrlv")
-	_ = os.MkdirAll(ctrlvDir, 0755)
-	return filepath.Join(ctrlvDir, "ai_config.json")
+	return GetConfigPath()
 }
 
 func LoadAIConfig() (*AIConfig, error) {
-	configPath := GetAIConfigPath()
-	data, err := os.ReadFile(configPath)
+	configPath, appCfg, err := EnsureConfigExists()
 	if err != nil {
-		// Create default config file template if not present
-		defaultCfg := &AIConfig{
-			Provider:     "openrouter",
-			APIKey:       "",
-			Model:        "openrouter/auto",
-			CustomPrompt: "Solve the coding question or problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
-			CodeOnly:     true,
-		}
-		SaveAIConfig(defaultCfg)
-		return defaultCfg, fmt.Errorf("config file created at %s. Please edit file to paste your AI API Key", configPath)
+		return nil, err
 	}
 
-	var cfg AIConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("failed to parse AI config file %s: %w", configPath, err)
+	aiCfg := appCfg.ToAIConfig()
+	if strings.TrimSpace(aiCfg.APIKey) == "" {
+		return aiCfg, fmt.Errorf("API Key is empty in %s. Run 'ctrlv config' to edit your config file", configPath)
 	}
 
-	if cfg.Provider == "" {
-		cfg.Provider = "openrouter"
-	}
-	if cfg.Model == "" {
-		cfg.Model = "openrouter/auto"
-	}
-	if cfg.CustomPrompt == "" {
-		cfg.CustomPrompt = "Solve the coding question or problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting."
-	}
-
-	return &cfg, nil
+	return aiCfg, nil
 }
 
 func SaveAIConfig(cfg *AIConfig) error {
-	configPath := GetAIConfigPath()
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	_, appCfg, err := EnsureConfigExists()
 	if err != nil {
-		return err
+		appCfg = &AppConfig{}
 	}
-	return os.WriteFile(configPath, data, 0644)
+	appCfg.APIKey = cfg.APIKey
+	if cfg.Model != "" {
+		appCfg.Model = cfg.Model
+	}
+	return SaveAppConfig(appCfg)
 }
 
 // TestAICredentials sends a lightweight test ping to verify API Key & credentials

@@ -1,4 +1,4 @@
-name: Deploy Web to GitHub Pages
+name: Deploy Web & Relay Server
 
 on:
   push:
@@ -12,7 +12,8 @@ permissions:
   id-token: write
 
 jobs:
-  deploy:
+  deploy_web:
+    name: Deploy ctrlvweb (deploy branch)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -26,7 +27,7 @@ jobs:
           if [[ "${COMMIT_MSG}" == *"buildweb"* ]]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
-            echo "Commit message does not contain 'buildweb'. Skipping deploy."
+            echo "Commit message does not contain 'buildweb'. Skipping web deploy."
             echo "should_deploy=false" >> $GITHUB_OUTPUT
           fi
 
@@ -38,3 +39,31 @@ jobs:
           publish_dir: ./ctrlvweb
           publish_branch: deploy
           commit_message: "deploy: publish ctrlvweb to deploy branch [skip ci]"
+
+  deploy_relayserver:
+    name: Deploy relayserver (relayserver branch)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Commit Message for relaydeploy
+        id: check_commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Latest Commit Message: ${COMMIT_MSG}"
+          if [[ "${COMMIT_MSG}" == *"relaydeploy"* ]]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "Commit message does not contain 'relaydeploy'. Skipping relay server deploy."
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy relayserver to relayserver branch
+        if: steps.check_commit.outputs.should_deploy == 'true' || github.event_name == 'workflow_dispatch'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./relayserver
+          publish_branch: relayserver
+          commit_message: "deploy: publish relayserver to relayserver branch [skip ci]"

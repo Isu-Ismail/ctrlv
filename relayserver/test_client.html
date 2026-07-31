@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stateful Relay Server Tester</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; padding: 1rem; background: #f8fafc; color: #0f172a; }
+    .card { background: white; border: 1px solid #cbd5e1; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    input, button, textarea { padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.9rem; }
+    button { background: #4f46e5; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #4338ca; }
+    #status { padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: bold; font-size: 0.8rem; }
+    .connected { background: #dcfce7; color: #15803d; }
+    .disconnected { background: #fef2f2; color: #b91c1c; }
+    img { max-width: 100%; height: auto; border: 1px solid #e2e8f0; margin-top: 0.5rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <h2>Stateful WebSocket Relay Tester</h2>
+
+  <div class="card">
+    <label>Relay URL:</label>
+    <input type="text" id="wsUrl" value="ws://localhost:8080/ws" style="width: 260px;">
+    <label>Room ID:</label>
+    <input type="text" id="roomId" value="test-room-1" style="width: 110px;">
+    <button id="btnConnect">Connect</button>
+    <span id="status" class="disconnected">Disconnected</span>
+  </div>
+
+  <div class="card">
+    <h3>1. Text Exchange</h3>
+    <textarea id="textInput" rows="3" style="width: 100%; box-sizing: border-box;" placeholder="Type text snippet..."></textarea>
+    <br><br>
+    <button id="btnSendText">Send Text to Room</button>
+  </div>
+
+  <div class="card">
+    <h3>2. Screenshot / Image Upload</h3>
+    <input type="file" id="fileInput" accept="image/*">
+    <br><br>
+    <div id="imageDisplay"><p style="color: #64748b;">No image received yet.</p></div>
+  </div>
+
+  <script>
+    let ws = null;
+    const wsUrlInput = document.getElementById("wsUrl");
+    const roomIdInput = document.getElementById("roomId");
+    const btnConnect = document.getElementById("btnConnect");
+    const statusSpan = document.getElementById("status");
+    const textInput = document.getElementById("textInput");
+    const btnSendText = document.getElementById("btnSendText");
+    const fileInput = document.getElementById("fileInput");
+    const imageDisplay = document.getElementById("imageDisplay");
+
+    btnConnect.addEventListener("click", () => {
+      const url = `${wsUrlInput.value}?room=${encodeURIComponent(roomIdInput.value)}`;
+      ws = new WebSocket(url);
+
+      ws.onopen = () => {
+        statusSpan.textContent = "Connected";
+        statusSpan.className = "connected";
+      };
+      ws.onclose = () => {
+        statusSpan.textContent = "Disconnected";
+        statusSpan.className = "disconnected";
+      };
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === "text") {
+          textInput.value = msg.content;
+        } else if (msg.type === "image") {
+          imageDisplay.innerHTML = `<img src="${msg.content}" alt="Received Screenshot">`;
+        }
+      };
+    });
+
+    btnSendText.addEventListener("click", () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return alert("Connect first!");
+      ws.send(JSON.stringify({ type: "text", content: textInput.value }));
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "image", content: evt.target.result }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
+</body>
+</html>
