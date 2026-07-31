@@ -92,7 +92,7 @@ func (rs *RelayService) VerifyConnection(roomID string) error {
 	return nil
 }
 
-func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, onNewText func(text string, senderID string)) {
+func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, onNewText func(msgType string, text string, senderID string)) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -120,8 +120,8 @@ func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, on
 				break
 			}
 
-			if msg.Type == "text" && strings.TrimSpace(msg.Content) != "" {
-				onNewText(msg.Content, msg.SenderID)
+			if (msg.Type == "web_exe" || msg.Type == "text" || msg.Type == "exe_web") && strings.TrimSpace(msg.Content) != "" {
+				onNewText(msg.Type, msg.Content, msg.SenderID)
 			}
 		}
 
@@ -180,7 +180,7 @@ func (rs *RelayService) UploadScreenshot(roomID string, base64Image string) erro
 }
 
 func (rs *RelayService) UploadQuestionText(roomID string, text string) error {
-	return rs.SendMessage(roomID, "text", text)
+	return rs.SendMessage(roomID, "exe_web", text)
 }
 
 func (rs *RelayService) Close() {

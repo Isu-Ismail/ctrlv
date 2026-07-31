@@ -23,12 +23,13 @@ type Message struct {
 
 // Room represents a stateful sync room in RAM
 type Room struct {
-	ID          string
-	Clients     map[*websocket.Conn]string // Maps WebSocket connection to Client Type ("browser" or "cli")
-	LatestText  string
-	LatestImage string
-	LastUpdated time.Time
-	mu          sync.RWMutex
+	ID            string
+	Clients       map[*websocket.Conn]string // Maps WebSocket connection to Client Type ("browser" or "cli")
+	LatestWebText string
+	LatestPCText  string
+	LatestImage   string
+	LastUpdated   time.Time
+	mu            sync.RWMutex
 }
 
 type Hub struct {
@@ -70,8 +71,9 @@ func (h *Hub) StartCleanupWorker() {
 				room.mu.Lock()
 				if len(room.Clients) == 0 {
 					// Clear text/image cache if empty for > 10 minutes
-					if now.Sub(room.LastUpdated) > 10*time.Minute && (room.LatestText != "" || room.LatestImage != "") {
-						room.LatestText = ""
+					if now.Sub(room.LastUpdated) > 10*time.Minute && (room.LatestWebText != "" || room.LatestPCText != "" || room.LatestImage != "") {
+						room.LatestWebText = ""
+						room.LatestPCText = ""
 						room.LatestImage = ""
 						log.Printf("[Cleanup] Wiped stale text & image RAM cache for empty Room: %s", id)
 					}
@@ -154,8 +156,17 @@ func main() {
 		room.LastUpdated = time.Now()
 
 		// Push latest room state to the newly connected client
-		if room.LatestText != "" {
-			_ = conn.WriteJSON(Message{Type: "text", RoomID: roomID, Content: room.LatestText})
+		if clientType == "cli" {
+			if room.LatestWebText != "" {
+				_ = conn.WriteJSON(Message{Type: "web_exe", RoomID: roomID, Content: room.LatestWebText})
+			}
+		} else {
+			if room.LatestWebText != "" {
+				_ = conn.WriteJSON(Message{Type: "web_exe", RoomID: roomID, Content: room.LatestWebText})
+			}
+			if room.LatestPCText != "" {
+				_ = conn.WriteJSON(Message{Type: "exe_web", RoomID: roomID, Content: room.LatestPCText})
+			}
 		}
 		if room.LatestImage != "" {
 			_ = conn.WriteJSON(Message{Type: "image", RoomID: roomID, Content: room.LatestImage})
@@ -200,8 +211,10 @@ func main() {
 			room.mu.Lock()
 			room.LastUpdated = time.Now()
 			switch msg.Type {
-			case "text":
-				room.LatestText = msg.Content
+			case "web_exe", "text":
+				room.LatestWebText = msg.Content
+			case "exe_web":
+				room.LatestPCText = msg.Content
 			case "image":
 				room.LatestImage = msg.Content
 			}

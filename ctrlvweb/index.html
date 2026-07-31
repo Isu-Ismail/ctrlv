@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="logo.svg">
@@ -146,24 +146,17 @@
             </div>
 
             <!-- PC Question Text Panel (Ctrl+Shift+T) -->
-            <div id="pcSentTextViewer" class="pc-text-box" style="display: none;">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
-                <span style="font-size: 0.82rem; font-weight: 700; color: var(--accent-primary);">
-                  <i class="fa-solid fa-terminal"></i> PC Clipboard Text:
-                </span>
-                <button class="btn-tool" id="btnSolvePCSentText" style="padding: 0.25rem 0.6rem; font-size: 0.78rem;">
-                  <i class="fa-solid fa-wand-magic-sparkles"></i> Solve
-                </button>
-              </div>
-              <div id="pcSentTextDisplay" class="pc-text-content">
-                No question text received yet. Press Ctrl+Shift+T on your PC to send text snippets here.
-              </div>
+            <div id="pcSentTextViewer" class="code-editor-area" style="display: none;">
+              <textarea id="pcSentTextDisplay" class="code-textarea" placeholder="No question text received yet. Press Ctrl+Shift+T on your PC or type text here..."></textarea>
             </div>
 
             <!-- Bottom Actions Bar -->
             <div id="screenshotActions" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
               <button class="btn-tool" id="btnDownloadImg">
                 <i class="fa-solid fa-download"></i> Download Image
+              </button>
+              <button class="btn-tool" id="btnCopyPCSentText" style="display: none;">
+                <i class="fa-regular fa-copy"></i> Copy Text
               </button>
               <button class="btn-send" id="btnSolveGemini">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Solve with AI

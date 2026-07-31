@@ -126,18 +126,23 @@ if (brandLogoBtn) brandLogoBtn.addEventListener("click", (e) => { e.preventDefau
 // Tab Switching inside Dashboard
 function switchTab(tab) {
   activeTab = tab;
+  const btnDownloadImg = document.getElementById("btnDownloadImg");
+  const btnCopyPCSentText = document.getElementById("btnCopyPCSentText");
+
   if (tab === "screenshot") {
     if (tabBtnScreenshot) tabBtnScreenshot.className = "tab-btn active";
     if (tabBtnPCText) tabBtnPCText.className = "tab-btn";
     if (screenshotViewer) screenshotViewer.style.display = "flex";
     if (pcSentTextViewer) pcSentTextViewer.style.display = "none";
-    if (screenshotActions) screenshotActions.style.display = "flex";
+    if (btnDownloadImg) btnDownloadImg.style.display = "inline-flex";
+    if (btnCopyPCSentText) btnCopyPCSentText.style.display = "none";
   } else {
     if (tabBtnScreenshot) tabBtnScreenshot.className = "tab-btn";
     if (tabBtnPCText) tabBtnPCText.className = "tab-btn active";
     if (screenshotViewer) screenshotViewer.style.display = "none";
-    if (pcSentTextViewer) pcSentTextViewer.style.display = "block";
-    if (screenshotActions) screenshotActions.style.display = "none";
+    if (pcSentTextViewer) pcSentTextViewer.style.display = "flex";
+    if (btnDownloadImg) btnDownloadImg.style.display = "none";
+    if (btnCopyPCSentText) btnCopyPCSentText.style.display = "inline-flex";
   }
 }
 
@@ -164,13 +169,55 @@ function saveCachedScreenshot(b64Data) {
   }
 }
 
-function loadAndDisplayCachedScreenshot() {
+function getCachedWebText() {
+  try {
+    return localStorage.getItem(`ctrlv_last_web_text_${currentRoomId}`) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function saveCachedWebText(text) {
+  if (text === undefined || text === null) return;
+  try {
+    localStorage.setItem(`ctrlv_last_web_text_${currentRoomId}`, text);
+  } catch (e) {}
+}
+
+function getCachedPCText() {
+  try {
+    return localStorage.getItem(`ctrlv_last_pc_text_${currentRoomId}`) || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+function saveCachedPCText(text) {
+  if (text === undefined || text === null) return;
+  try {
+    localStorage.setItem(`ctrlv_last_pc_text_${currentRoomId}`, text);
+  } catch (e) {}
+}
+
+function loadAndDisplayCachedData() {
   const cached = getCachedScreenshot();
   if (cached && cached.trim() !== "") {
     cachedImagePath = cached;
-    screenshotImg.src = cached;
-    screenshotImg.style.display = "block";
-    emptyState.style.display = "none";
+    if (screenshotImg) {
+      screenshotImg.src = cached;
+      screenshotImg.style.display = "block";
+    }
+    if (emptyState) emptyState.style.display = "none";
+  }
+
+  const cachedWeb = getCachedWebText();
+  if (textInput && cachedWeb) {
+    textInput.value = cachedWeb;
+  }
+
+  const cachedPC = getCachedPCText();
+  if (pcSentTextDisplay && cachedPC) {
+    pcSentTextDisplay.value = cachedPC;
   }
 }
 
@@ -507,14 +554,15 @@ function parseCleanCodeOnly(rawText) {
 
 function sendTextToRelay(cleanText) {
   if (!ws || ws.readyState !== WebSocket.OPEN || !cleanText) return;
-  ws.send(JSON.stringify({ type: "text", room_id: currentRoomId, content: cleanText }));
+  saveCachedWebText(cleanText);
+  ws.send(JSON.stringify({ type: "web_exe", room_id: currentRoomId, content: cleanText, sender_id: "browser" }));
 }
 
 if (btnSolveGemini) {
   btnSolveGemini.addEventListener("click", () => {
     const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
     if (activeTab === "pctext") {
-      const question = pcSentTextDisplay ? pcSentTextDisplay.textContent.trim() : "";
+      const question = pcSentTextDisplay ? pcSentTextDisplay.value.trim() : "";
       if (!question || question.startsWith("No question text received")) {
         updateAISolverStatus("error", "No question text available to solve!");
         return;
@@ -533,13 +581,27 @@ if (btnSolveGemini) {
 
 if (btnSolvePCSentText) {
   btnSolvePCSentText.addEventListener("click", () => {
-    const question = pcSentTextDisplay ? pcSentTextDisplay.textContent.trim() : "";
+    const question = pcSentTextDisplay ? pcSentTextDisplay.value.trim() : "";
     if (!question || question.startsWith("No question text received")) {
       updateAISolverStatus("error", "No question text available to solve!");
       return;
     }
     const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
     solveTextWithGemini(question, prompt);
+  });
+}
+
+const btnCopyPCSentText = document.getElementById("btnCopyPCSentText");
+if (btnCopyPCSentText) {
+  btnCopyPCSentText.addEventListener("click", () => {
+    const text = pcSentTextDisplay ? pcSentTextDisplay.value : "";
+    if (text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btnCopyPCSentText.innerHTML;
+        btnCopyPCSentText.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+        setTimeout(() => { btnCopyPCSentText.innerHTML = orig; }, 2000);
+      });
+    }
   });
 }
 
@@ -578,7 +640,7 @@ function connectToRoom(roomId) {
   cachedImagePath = null;
   cachedPCSentText = null;
 
-  loadAndDisplayCachedScreenshot();
+  loadAndDisplayCachedData();
 
   const savedRelayUrl = (localStorage.getItem("ctrlv_relay_url") || "wss://ctrlv.onrender.com/ws").trim();
   const fullWsUrl = `${savedRelayUrl}?room=${encodeURIComponent(roomId)}&client=browser`;
@@ -627,21 +689,28 @@ function connectToRoom(roomId) {
               solveImageWithGemini(newImg, prompt);
             }
           }
-        } else if (msg.type === "text" && msg.content) {
+        } else if ((msg.type === "exe_web" || msg.type === "text" || msg.type === "web_exe") && msg.content) {
           const newText = msg.content;
-          if (newText !== cachedPCSentText) {
-            const isFirstLoad = (cachedPCSentText === null);
-            cachedPCSentText = newText;
-
-            if (pcSentTextDisplay) {
-              pcSentTextDisplay.textContent = newText;
-              pcSentTextDisplay.style.color = "var(--text-main)";
+          if (msg.type === "web_exe") {
+            if (textInput && textInput.value !== newText) {
+              textInput.value = newText;
             }
+            saveCachedWebText(newText);
+          } else if (msg.type === "exe_web" || msg.type === "text") {
+            if (newText !== cachedPCSentText) {
+              const isFirstLoad = (cachedPCSentText === null);
+              cachedPCSentText = newText;
 
-            if (autoSolveEnabled && !isFirstLoad) {
-              switchTab("pctext");
-              const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
-              solveTextWithGemini(newText, prompt);
+              if (pcSentTextDisplay) {
+                pcSentTextDisplay.value = newText;
+              }
+              saveCachedPCText(newText);
+
+              if (autoSolveEnabled && !isFirstLoad) {
+                switchTab("pctext");
+                const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
+                solveTextWithGemini(newText, prompt);
+              }
             }
           }
         }
@@ -853,6 +922,9 @@ document.querySelectorAll(".btn-code-copy").forEach(btn => {
 });
 
 updateDlContent();
+
+// Load and restore all cached screenshots, web text, and PC question text for current room
+loadAndDisplayCachedData();
 
 // NOTE: DO NOT auto-connect on load! Status stays Disconnected until user clicks Connect.
 updateConnectionStatus(false);

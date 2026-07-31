@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -468,28 +469,38 @@ func runDaemon(roomID string, wantScreen bool) {
 	ctx, cancelListener := context.WithCancel(context.Background())
 	defer cancelListener()
 
-	go relayService.ListenRoomUpdates(ctx, roomID, func(rawText string, senderID string) {
-		// Ignore text sent by THIS CLI instance (prevents self-echo & overlay pop!)
-		if senderID != "" && senderID == relayService.InstanceID {
+	var latestWebText string
+	var latestWebTextMu sync.RWMutex
+
+	go relayService.ListenRoomUpdates(ctx, roomID, func(msgType string, rawText string, senderID string) {
+		// Ignore PC -> Web ("exe_web") text and messages sent by THIS CLI instance
+		if msgType == "exe_web" || (senderID != "" && senderID == relayService.InstanceID) {
 			return
 		}
 
-		cleanText := rawText
-		if len(cleanText) > 6 && cleanText[len(cleanText)-6:] == "\n/---/" {
-			cleanText = cleanText[:len(cleanText)-6]
-		} else if len(cleanText) > 5 && cleanText[len(cleanText)-5:] == "/---/" {
-			cleanText = cleanText[:len(cleanText)-5]
-		}
+		// Process Web -> PC ("web_exe" or fallback "text") incoming payloads
+		if msgType == "web_exe" || msgType == "text" {
+			cleanText := rawText
+			if len(cleanText) > 6 && cleanText[len(cleanText)-6:] == "\n/---/" {
+				cleanText = cleanText[:len(cleanText)-6]
+			} else if len(cleanText) > 5 && cleanText[len(cleanText)-5:] == "/---/" {
+				cleanText = cleanText[:len(cleanText)-5]
+			}
 
-		if err := clipboard.WriteAll(cleanText); err != nil {
-			log.Printf("[Realtime Clipboard Error] Failed to write text: %v", err)
-		} else {
-			log.Printf("[Realtime Auto-Push] Automatically copied text to PC clipboard: \"%s\"", cleanText)
-		}
+			latestWebTextMu.Lock()
+			latestWebText = cleanText
+			latestWebTextMu.Unlock()
 
-		if wantScreen {
-			service.UpdateOverlayText(cleanText)
-			service.UpdateOverlayStatus("Realtime Auto-Pushed & Clipboard Updated!")
+			if err := clipboard.WriteAll(cleanText); err != nil {
+				log.Printf("[Realtime Clipboard Error] Failed to write text: %v", err)
+			} else {
+				log.Printf("[Realtime Auto-Push] Automatically copied text to PC clipboard: \"%s\"", cleanText)
+			}
+
+			if wantScreen {
+				service.UpdateOverlayText(cleanText)
+				service.UpdateOverlayStatus("AI Solution Received & Copied to Clipboard!")
+			}
 		}
 	})
 
@@ -520,20 +531,26 @@ func runDaemon(roomID string, wantScreen bool) {
 
 	// Callback for Manual Re-Fetch Text (Ctrl + Shift + F)
 	onFetchText := func() {
-		if wantScreen {
-			service.UpdateOverlayStatus("Reading Clipboard...")
-		}
-		text, err := clipboard.ReadAll()
-		if err != nil || text == "" {
-			log.Printf("[Clipboard Error] %v", err)
+		latestWebTextMu.RLock()
+		text := latestWebText
+		latestWebTextMu.RUnlock()
+
+		if text == "" {
 			if wantScreen {
-				service.UpdateOverlayStatus("Clipboard Empty!")
+				service.UpdateOverlayStatus("No AI Solution Available Yet!")
 			}
 			return
 		}
+
+		if err := clipboard.WriteAll(text); err != nil {
+			log.Printf("[Clipboard Write Error] %v", err)
+		} else {
+			log.Printf("[Fetch Text] Re-copied AI text to PC clipboard: \"%s\"", text)
+		}
+
 		if wantScreen {
 			service.UpdateOverlayText(text)
-			service.UpdateOverlayStatus("Clipboard Text Re-Synced!")
+			service.UpdateOverlayStatus("Fetched AI Solution & Copied!")
 		}
 	}
 
@@ -559,9 +576,9 @@ func runDaemon(roomID string, wantScreen bool) {
 				service.UpdateOverlayStatus("Failed to Upload Text!")
 			}
 		} else {
-			log.Printf("[Relay] Uploaded PC clipboard text: \"%s\"", clipText)
+			log.Printf("[Relay] Uploaded PC clipboard text question: \"%s\"", clipText)
 			if wantScreen {
-				service.UpdateOverlayStatus("PC Clipboard Text Sent via Relay!")
+				service.UpdateOverlayStatus("Question Sent to Web!")
 			}
 		}
 	}
