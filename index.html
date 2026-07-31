@@ -336,8 +336,8 @@
               <div class="card-title" style="color: var(--accent-primary);">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> AI Vision Assistant Settings
               </div>
-              <div id="aiStatusBadge" class="conn-status-badge offline">
-                <i class="fa-solid fa-robot"></i> <span id="aiStatusText">AI Key Missing</span>
+              <div id="aiStatusBadge" class="status-pill offline">
+                <span id="aiStatusText"><i class="fa-solid fa-robot"></i> AI Key Missing</span>
               </div>
             </div>
 
@@ -453,6 +453,21 @@
     <div id="imageModal" class="modal" style="display: none;">
       <span id="btnCloseModal" class="modal-close">&times;</span>
       <img id="modalImg" class="modal-content" src="" alt="Full Screen Screenshot">
+    </div>
+
+    <!-- Error Alert Popup Modal -->
+    <div id="errorModal" class="modal" style="display: none; align-items: center; justify-content: center; backdrop-filter: blur(6px); background: rgba(0,0,0,0.65); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000;">
+      <div class="card" style="max-width: 560px; width: 90%; background: var(--bg-secondary); border: 1px solid var(--accent-red); border-radius: var(--radius-lg); box-shadow: 0 20px 40px rgba(0,0,0,0.5); padding: 1.5rem; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--accent-red); font-size: 1.1rem; font-weight: 700;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.4rem;"></i>
+          <span id="errorModalTitle">API Provider Error</span>
+        </div>
+        <div id="errorModalBody" style="font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.6; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--card-border); padding: 1rem; border-radius: var(--radius-md); max-height: 280px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;"></div>
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 0.25rem;">
+          <button class="btn-tool" id="btnErrorCancel" style="padding: 0.45rem 1rem;">Cancel</button>
+          <button class="btn-send" id="btnErrorOk" style="padding: 0.45rem 1.25rem; background: var(--accent-red); border-color: var(--accent-red);">OK</button>
+        </div>
+      </div>
     </div>
 
     <!-- App Footer -->
