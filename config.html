@@ -16,6 +16,14 @@
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="logo.svg">
 
+  <!-- Instant Anti-Flash Theme Script -->
+  <script>
+    (function() {
+      var t = localStorage.getItem("ctrlv_theme") || "dark";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+
   <!-- Modular CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
