@@ -1,0 +1,87 @@
+/* View 3 & Config.html Page Styling */
+
+.config-container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.notice-banner {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: 0.88rem;
+  color: var(--status-seen-text);
+  line-height: 1.6;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.notice-banner a {
+  color: var(--accent-green);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.config-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.key-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.key-toggle-btn {
+  position: absolute;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.9rem;
+  transition: var(--transition-fast);
+}
+
+.key-toggle-btn:hover {
+  color: var(--accent-primary);
+}
+
+.checkbox-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-tertiary);
+  padding: 0.85rem 1.1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+}
+
+.checkbox-card:hover {
+  border-color: var(--card-border-hover);
+}
+
+.checkbox-card input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .config-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}

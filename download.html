@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scrollable">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,276 +8,198 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- External Stylesheet -->
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <!-- Modular CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="scrollable">
+<body>
 
-  <div class="container" style="max-width: 960px; padding-top: 1rem; padding-bottom: 3rem;">
-    <!-- Top Header -->
-    <header style="margin-bottom: 1.5rem;">
-      <div class="brand">
-        <a href="index.html" class="brand-logo" title="Return to Dashboard"><i class="fa-solid fa-bolt"></i></a>
-        <div style="display: flex; flex-direction: column;">
-          <div class="brand-title">Install ctrlv CLI</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
-            Cross-Platform Binaries & Setup Commands
+  <div class="app-shell">
+    <!-- Top Sticky Full-Width Header Bar -->
+    <header class="app-header">
+      <div class="header-inner">
+        <a href="index.html" class="brand" title="Return to Dashboard">
+          <div class="brand-logo">
+            <img src="logo.svg" alt="ctrlv logo" style="width: 22px; height: 22px; display: block;">
           </div>
-        </div>
-      </div>
+          <div style="display: flex; flex-direction: column;">
+            <div class="brand-title">Install ctrlv CLI</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Cross-Platform Binaries & Commands</span>
+          </div>
+        </a>
 
-      <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-        <a href="config.html" class="btn-tool" style="text-decoration: none;" title="Configure Settings">
-          <i class="fa-solid fa-gear"></i> Config
-        </a>
-        <a href="index.html" class="btn-create-room" style="text-decoration: none;">
-          <i class="fa-solid fa-arrow-left"></i> Back to Sync
-        </a>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <a href="config.html" class="btn-tool" style="text-decoration: none;">
+            <i class="fa-solid fa-sliders"></i> Config
+          </a>
+          <a href="index.html" class="btn-create-room" style="text-decoration: none;">
+            <i class="fa-solid fa-arrow-left"></i> Back to Sync
+          </a>
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Light / Dark Theme">
+            <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- OS Selection Header Bar -->
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
-      <!-- OS Tabs -->
-      <div class="dl-os-nav">
-        <button class="dl-os-btn active" id="osBtnWin" data-os="windows">
-          <i class="fa-brands fa-windows" style="color: #00adef;"></i> Windows
-        </button>
-        <button class="dl-os-btn" id="osBtnLinux" data-os="linux">
-          <i class="fa-brands fa-linux" style="color: #f59e0b;"></i> Linux (Ubuntu/Debian)
-        </button>
-        <button class="dl-os-btn" id="osBtnMac" data-os="mac">
-          <i class="fa-brands fa-apple" style="color: #64748b;"></i> macOS
-        </button>
-      </div>
+    <!-- Main Full-Width Content Container -->
+    <main class="app-container">
+      <div class="config-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <!-- OS Navigation Tabs -->
+          <div class="dl-os-nav">
+            <button class="dl-os-btn active" id="osBtnWin" data-os="windows">
+              <i class="fa-brands fa-windows" style="color: #00adef;"></i> Windows
+            </button>
+            <button class="dl-os-btn" id="osBtnLinux" data-os="linux">
+              <i class="fa-brands fa-linux" style="color: #f59e0b;"></i> Linux
+            </button>
+            <button class="dl-os-btn" id="osBtnMac" data-os="mac">
+              <i class="fa-brands fa-apple"></i> macOS
+            </button>
+          </div>
 
-      <!-- Architecture Pills -->
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Architecture:</span>
-        <button class="dl-arch-pill active" id="archBtnAmd64" data-arch="amd64">x86_64 / AMD64</button>
-        <button class="dl-arch-pill" id="archBtnArm64" data-arch="arm64">ARM64</button>
-      </div>
-    </div>
-
-    <!-- Main Card Body -->
-    <div class="card" style="gap: 1.5rem; padding: 1.5rem;">
-      <!-- 1. WINDOWS PANEL -->
-      <div id="panelWindows" class="dl-panel">
-        <!-- Section 1: PowerShell Install -->
-        <div style="margin-bottom: 1.25rem;">
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Install via PowerShell (downloads and extracts the binary):
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">PS&gt;</span>
-            <span class="code-box-text" id="winPsCmd">Invoke-WebRequest -Uri https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip -OutFile ctrlv.zip; Expand-Archive ctrlv.zip -DestinationPath C:\ctrlv</span>
-            <button class="btn-code-copy" data-target="winPsCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+          <!-- Architecture Selector Pills -->
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);">Arch:</span>
+            <button class="dl-arch-pill active" id="archBtnAmd64" data-arch="amd64">x86_64 / AMD64</button>
+            <button class="dl-arch-pill" id="archBtnArm64" data-arch="arm64">ARM64</button>
           </div>
         </div>
 
-        <!-- Section 2: Download Portable ZIP -->
-        <div style="margin-bottom: 1.25rem;">
-          <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip" id="winZipLink" class="dl-action-btn">
-            <i class="fa-solid fa-file-zipper"></i> <span id="winZipBtnText">Download Portable ZIP (x64)</span>
-          </a>
-        </div>
+        <!-- Download Options Card Body -->
+        <div class="card" style="padding: 1.5rem; gap: 1.5rem;">
+          <!-- Windows Panel -->
+          <div id="panelWindows" class="dl-panel">
+            <div style="margin-bottom: 1.25rem;">
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Quick Install via PowerShell:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">PS&gt;</span>
+                <span class="code-box-text" id="winPsCmd">Invoke-WebRequest -Uri https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip -OutFile ctrlv.zip; Expand-Archive ctrlv.zip -DestinationPath C:\ctrlv</span>
+                <button class="btn-code-copy" data-target="winPsCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
 
-        <!-- Section 3: Configure PATH -->
-        <div>
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Configure PATH Environment Variable:
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">PS&gt;</span>
-            <span class="code-box-text" id="winPathCmd">[System.Environment]::SetEnvironmentVariable("PATH", [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";C:\ctrlv", "User")</span>
-            <button class="btn-code-copy" data-target="winPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+            <div style="margin-bottom: 1.25rem;">
+              <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip" id="winZipLink" class="dl-action-btn">
+                <i class="fa-solid fa-file-zipper"></i> <span id="winZipBtnText">Download Portable ZIP (x64)</span>
+              </a>
+            </div>
+
+            <div>
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Add C:\ctrlv to PATH Environment Variable:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">PS&gt;</span>
+                <span class="code-box-text" id="winPathCmd">[System.Environment]::SetEnvironmentVariable("PATH", [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";C:\ctrlv", "User")</span>
+                <button class="btn-code-copy" data-target="winPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 2. LINUX PANEL -->
-      <div id="panelLinux" class="dl-panel" style="display: none;">
-        <!-- Section 1: Apt Install -->
-        <div style="margin-bottom: 1.25rem;">
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Install the Debian package via apt:
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">$</span>
-            <span class="code-box-text" id="linuxAptCmd">wget https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb && sudo apt install ./ctrlv-cli_linux_amd64.deb</span>
-            <button class="btn-code-copy" data-target="linuxAptCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+          <!-- Linux Panel -->
+          <div id="panelLinux" class="dl-panel" style="display: none;">
+            <div style="margin-bottom: 1.25rem;">
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Install Debian / Ubuntu Package via Apt:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">$</span>
+                <span class="code-box-text" id="linuxAptCmd">wget https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb && sudo apt install ./ctrlv-cli_linux_amd64.deb</span>
+                <button class="btn-code-copy" data-target="linuxAptCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+              <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb" id="linuxDebLink" class="dl-action-btn">
+                <i class="fa-solid fa-download"></i> <span id="linuxDebBtnText">Download .deb (x64)</span>
+              </a>
+              <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.rpm" id="linuxRpmLink" class="dl-action-btn secondary">
+                <i class="fa-solid fa-download"></i> <span id="linuxRpmBtnText">Download .rpm (x64)</span>
+              </a>
+            </div>
+
+            <div>
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Configure Environment PATH:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">$</span>
+                <span class="code-box-text" id="linuxPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.bashrc</span>
+                <button class="btn-code-copy" data-target="linuxPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <!-- Section 2: Download Direct Package Buttons -->
-        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
-          <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb" id="linuxDebLink" class="dl-action-btn">
-            <i class="fa-solid fa-download"></i> <span id="linuxDebBtnText">Download .deb (x64)</span>
-          </a>
-          <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.rpm" id="linuxRpmLink" class="dl-action-btn secondary">
-            <i class="fa-solid fa-download"></i> <span id="linuxRpmBtnText">Download .rpm (x64)</span>
-          </a>
-        </div>
+          <!-- macOS Panel -->
+          <div id="panelMac" class="dl-panel" style="display: none;">
+            <div style="margin-bottom: 1.25rem;">
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Install binary via curl:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">$</span>
+                <span class="code-box-text" id="macCurlCmd">curl -sSfL https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz | tar -xz && sudo mv ctrlv /usr/local/bin/</span>
+                <button class="btn-code-copy" data-target="macCurlCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
 
-        <!-- Section 3: Manual PATH Configuration -->
-        <div>
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Manual PATH Configuration (if unpacking tarball manually):
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">$</span>
-            <span class="code-box-text" id="linuxPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.bashrc</span>
-            <button class="btn-code-copy" data-target="linuxPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+            <div style="margin-bottom: 1.25rem;">
+              <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz" id="macTarLink" class="dl-action-btn">
+                <i class="fa-solid fa-file-arrow-down"></i> <span id="macTarBtnText">Download tar.gz (Intel)</span>
+              </a>
+            </div>
+
+            <div>
+              <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                Configure PATH:
+              </p>
+              <div class="code-box">
+                <span class="code-box-prompt">$</span>
+                <span class="code-box-text" id="macPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.zshrc</span>
+                <button class="btn-code-copy" data-target="macPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 3. MACOS PANEL -->
-      <div id="panelMac" class="dl-panel" style="display: none;">
-        <!-- Section 1: Curl & Unpack -->
-        <div style="margin-bottom: 1.25rem;">
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Install via curl &amp; unpack to your bin folder:
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">$</span>
-            <span class="code-box-text" id="macCurlCmd">curl -sSfL https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz | tar -xz && sudo mv ctrlv /usr/local/bin/</span>
-            <button class="btn-code-copy" data-target="macCurlCmd"><i class="fa-regular fa-copy"></i> Copy</button>
-          </div>
-        </div>
-
-        <!-- Section 2: Download Tarball Button -->
-        <div style="margin-bottom: 1.25rem;">
-          <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz" id="macTarLink" class="dl-action-btn">
-            <i class="fa-solid fa-file-arrow-down"></i> <span id="macTarBtnText">Download tar.gz (Intel)</span>
-          </a>
-        </div>
-
-        <!-- Section 3: Manual PATH Configuration -->
-        <div>
-          <p style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.5rem;">
-            Manual PATH Configuration (if not using /usr/local/bin):
-          </p>
-          <div class="code-box">
-            <span class="code-box-prompt">$</span>
-            <span class="code-box-text" id="macPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.zshrc</span>
-            <button class="btn-code-copy" data-target="macPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
-          </div>
         </div>
       </div>
-    </div>
+    </main>
 
-    <!-- Versions Footer Section -->
-    <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 1rem;">
-      <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Versions:</span>
-      <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest" target="_blank" class="version-pill latest">
-        <i class="fa-solid fa-tag"></i> v1.0.0 (Latest)
-      </a>
-      <a href="https://github.com/Isu-Ismail/ctrlv/releases" target="_blank" class="version-pill">
-        v1.0.0
-      </a>
-    </div>
-
-    <footer style="margin-top: 1.5rem;">
-      ctrlv &bull; Real-time cross-device sync &amp; CLI Binaries
+    <footer class="app-footer">
+      ctrlv &bull; Realtime Cross-Device Sync
     </footer>
   </div>
 
-  <!-- Interactive Module Script for Tab/Arch Switching & Copying -->
-  <script type="module">
-    const osBtns = document.querySelectorAll(".dl-os-btn");
-    const archBtns = document.querySelectorAll(".dl-arch-pill");
-    const panels = {
-      windows: document.getElementById("panelWindows"),
-      linux: document.getElementById("panelLinux"),
-      mac: document.getElementById("panelMac")
-    };
-
-    let currentOs = "windows";
-    let currentArch = "amd64"; // "amd64" or "arm64"
-
-    function updateContent() {
-      // Toggle OS Panels
-      Object.keys(panels).forEach(os => {
-        panels[os].style.display = (os === currentOs) ? "block" : "none";
-      });
-
-      // Update Active Classes for OS Buttons
-      osBtns.forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.os === currentOs);
-      });
-
-      // Update Active Classes for Arch Buttons
-      archBtns.forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.arch === currentArch);
-      });
-
-      const archLabel = (currentArch === "amd64") ? "x64" : "ARM64";
-
-      // Update Windows Links & Text
-      const winZipUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_${currentArch}.zip`;
-      document.getElementById("winPsCmd").textContent = `Invoke-WebRequest -Uri ${winZipUrl} -OutFile ctrlv.zip; Expand-Archive ctrlv.zip -DestinationPath C:\\ctrlv`;
-      document.getElementById("winZipLink").href = winZipUrl;
-      document.getElementById("winZipBtnText").textContent = `Download Portable ZIP (${archLabel})`;
-
-      // Update Linux Links & Text
-      const linuxDebUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_${currentArch}.deb`;
-      const linuxRpmUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_${currentArch}.rpm`;
-      document.getElementById("linuxAptCmd").textContent = `wget ${linuxDebUrl} && sudo apt install ./ctrlv-cli_linux_${currentArch}.deb`;
-      document.getElementById("linuxDebLink").href = linuxDebUrl;
-      document.getElementById("linuxDebBtnText").textContent = `Download .deb (${archLabel})`;
-      document.getElementById("linuxRpmLink").href = linuxRpmUrl;
-      document.getElementById("linuxRpmBtnText").textContent = `Download .rpm (${archLabel})`;
-
-      // Update macOS Links & Text
-      const macTarUrl = `https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_${currentArch}.tar.gz`;
-      const macLabel = (currentArch === "amd64") ? "Intel" : "Apple Silicon";
-      document.getElementById("macCurlCmd").textContent = `curl -sSfL ${macTarUrl} | tar -xz && sudo mv ctrlv /usr/local/bin/`;
-      document.getElementById("macTarLink").href = macTarUrl;
-      document.getElementById("macTarBtnText").textContent = `Download tar.gz (${macLabel})`;
+  <script>
+    // Theme toggle helper script for standalone page
+    const themeBtn = document.getElementById("themeToggleBtn");
+    const themeIcon = document.getElementById("themeToggleIcon");
+    const currentTheme = localStorage.getItem("ctrlv_theme") || "dark";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+    if (themeIcon) {
+      themeIcon.className = currentTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
     }
-
-    // OS Tab Handlers
-    osBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        currentOs = btn.dataset.os;
-        updateContent();
+    if (themeBtn) {
+      themeBtn.addEventListener("click", () => {
+        const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("ctrlv_theme", next);
+        if (themeIcon) {
+          themeIcon.className = next === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+        }
       });
-    });
-
-    // Architecture Pill Handlers
-    archBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        currentArch = btn.dataset.arch;
-        updateContent();
-      });
-    });
-
-    // Copy Button Handlers
-    document.querySelectorAll(".btn-code-copy").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const targetId = btn.dataset.target;
-        const textToCopy = document.getElementById(targetId).textContent;
-        navigator.clipboard.writeText(textToCopy).then(() => {
-          const originalText = btn.innerHTML;
-          btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
-          btn.style.background = "#10b981";
-          setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = "";
-          }, 2000);
-        }).catch(err => {
-          console.error("Clipboard copy failed: ", err);
-        });
-      });
-    });
-
-    updateContent();
+    }
   </script>
 </body>
 </html>

@@ -1,189 +1,433 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ctrlv - Realtime Sync Dashboard</title>
-
+  <title>ctrlv - Realtime Cross-Device Sync & AI Assistant</title>
+  
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet">
-
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- External Stylesheet -->
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  
+  <!-- Modular CSS Architecture -->
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-  <div class="container">
-    <!-- Unified Compact Top Control Card -->
-    <div class="top-panel-card">
-      <!-- Row 1: Brand & Room Connections -->
-      <div class="top-panel-row">
-        <div class="brand">
-          <a href="index.html" class="brand-logo" title="ctrlv Realtime Sync"><i class="fa-solid fa-bolt"></i></a>
-          <div class="brand-title">ctrlv</div>
+  <div class="app-shell">
+    
+    <!-- Top Sticky Full-Width Header Bar -->
+    <header class="app-header">
+      <div class="header-inner">
+        <!-- Brand Logo & Live Connection Badge -->
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="#" class="brand" id="brandLogoBtn" title="ctrlv Realtime Sync">
+            <div class="brand-logo">
+              <img src="logo.svg" alt="ctrlv logo" style="width: 22px; height: 22px; display: block;">
+            </div>
+            <div class="brand-title">ctrlv</div>
+          </a>
+
           <div id="connStatusBadge" class="conn-status-badge offline">
             <i class="fa-solid fa-signal"></i> <span id="connStatusText">Disconnected</span>
           </div>
+
+          <div id="clientCountsBadge" class="conn-status-badge" style="display: none; background: var(--bg-tertiary); border: 1px solid var(--card-border); color: var(--text-muted); font-size: 0.78rem; gap: 0.65rem;">
+            <span title="Browser Web Clients Connected" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+              <i class="fa-solid fa-globe" style="color: var(--accent-cyan);"></i> <span id="browserCount">0</span>
+            </span>
+            <span title="PC CLI Executable Clients Connected" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+              <i class="fa-solid fa-laptop" style="color: var(--accent-primary);"></i> <span id="pcCount">0</span>
+            </span>
+          </div>
         </div>
 
+        <!-- Room Sync Selector & CLI Actions -->
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
           <div class="room-selector">
-            <i class="fa-solid fa-door-open" style="color: var(--text-muted);"></i>
-            <span style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">Room:</span>
-            <input type="text" id="roomIdInput" placeholder="Enter Room ID" value="room-alpha-123">
+            <i class="fa-solid fa-door-open" style="color: var(--text-muted); font-size: 0.85rem;"></i>
+            <input type="text" id="roomIdInput" placeholder="Room ID" value="ctrlv-a8f3b2">
+            <button class="btn-tool" id="btnGenRandomRoom" style="padding: 0.2rem 0.45rem; font-size: 0.75rem;" title="Generate Random Room ID">
+              <i class="fa-solid fa-dice"></i>
+            </button>
           </div>
 
           <button class="btn-create-room" id="btnConnect">
             <i class="fa-solid fa-plug"></i> <span id="btnConnectText">Connect</span>
           </button>
 
-          <button class="btn-tool" id="btnCopyRoom">
-            <i class="fa-regular fa-copy"></i> <span id="copyBtnText">Copy CLI Command</span>
+          <button class="btn-tool" id="btnCopyRoom" title="Copy CLI Connect Command">
+            <i class="fa-regular fa-copy"></i> <span id="copyBtnText">CLI Command</span>
           </button>
 
-          <a href="download.html" class="btn-tool" style="text-decoration: none;" title="Install & Download ctrlv CLI Binaries">
-            <i class="fa-solid fa-download"></i> CLI Download
-          </a>
+          <!-- SPA Navigation Tabs -->
+          <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--bg-tertiary); padding: 0.2rem; border-radius: var(--radius-sm); border: 1px solid var(--card-border);">
+            <button class="nav-tab-btn active" id="navBtnDashboard" data-view="dashboard">
+              <i class="fa-solid fa-rotate"></i> Sync
+            </button>
+            <button class="nav-tab-btn" id="navBtnDownload" data-view="download">
+              <i class="fa-solid fa-download"></i> CLI
+            </button>
+            <button class="nav-tab-btn" id="navBtnConfig" data-view="config">
+              <i class="fa-solid fa-sliders"></i> Config
+            </button>
+          </div>
 
-          <a href="config.html" class="btn-tool" style="text-decoration: none;" title="Configure Firebase & AI Settings">
-            <i class="fa-solid fa-gear"></i> Config
-          </a>
-        </div>
-      </div>
-
-      <!-- Divider -->
-      <div class="top-panel-divider"></div>
-
-      <!-- Row 2: Prompt Bar & AI Controls -->
-      <div class="top-panel-row">
-        <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 280px;">
-          <label for="aiInstructionInput" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">
-            <i class="fa-solid fa-terminal" style="color: var(--accent-primary);"></i> Prompt:
-          </label>
-          <input type="text" id="aiInstructionInput" class="config-input" style="padding: 0.35rem 0.65rem; font-size: 0.82rem;" placeholder="Instructions for AI Solver..." value="Solve the problem shown in this screenshot or text. Output ONLY clean, working code without explanations or markdown formatting.">
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-          <span id="aiSolverStatusBadge" class="status-pill pending" style="font-size: 0.75rem; padding: 0.2rem 0.6rem;">
-            <i class="fa-solid fa-robot"></i> <span id="aiSolverStatusText">AI Ready</span>
-          </span>
-
-          <button class="btn-tool" id="btnToggleAutoSolve" title="Automatically solve new screenshots/text questions on arrival">
-            <i class="fa-solid fa-bolt"></i> <span id="autoSolveLabel">Auto-Solve: ON</span>
-          </button>
-
-          <button class="btn-send" id="btnSolveGemini" style="padding: 0.35rem 0.85rem; font-size: 0.8rem;">
-            <i class="fa-solid fa-brain"></i> Solve Current
+          <!-- Light / Dark Mode Switcher -->
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Light / Dark Theme">
+            <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
           </button>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Main Dashboard Grid -->
-    <div class="dashboard-grid">
-      <!-- Left Panel: Tabbed Screenshot / PC Question Text Container -->
-      <div class="card">
-        <div class="card-header">
-          <!-- Header Tabs -->
-          <div class="tab-group">
-            <button class="tab-btn active" id="tabBtnScreenshot">
-              <i class="fa-solid fa-image"></i> Screenshot
-            </button>
-            <button class="tab-btn" id="tabBtnPCText">
-              <i class="fa-solid fa-laptop"></i> PC Text (Ctrl+Shift+T)
-            </button>
+    <!-- Main Full-Width Content Container -->
+    <main class="app-container">
+
+      <!-- VIEW 1: DASHBOARD (Sync Viewer & AI Vision Solver) -->
+      <div id="viewDashboard" class="spa-view">
+        <div class="dashboard-grid">
+          
+          <!-- Left Column: Image Viewer / Question Text -->
+          <div class="card dashboard-col">
+            <div class="card-header">
+              <!-- Switcher Tabs: Screenshot vs Question Text -->
+              <div class="tab-group">
+                <button class="tab-btn active" id="tabBtnScreenshot">
+                  <i class="fa-solid fa-desktop"></i> Screenshot
+                </button>
+                <button class="tab-btn" id="tabBtnPCText">
+                  <i class="fa-solid fa-keyboard"></i> PC Text
+                </button>
+              </div>
+
+              <!-- Quick Toggles: Auto-Save & Auto-Solve -->
+              <div style="display: flex; align-items: center; gap: 0.4rem;">
+                <button class="btn-tool" id="btnToggleAutoDownload" title="Auto-save incoming screenshots">
+                  <i class="fa-solid fa-floppy-disk"></i> <span id="autoDlLabel">Save: OFF</span>
+                </button>
+                <button class="btn-tool active" id="btnToggleAutoSolve" title="Automatically solve incoming screenshots/text with AI">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="autoSolveLabel">Auto: ON</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Screenshot Panel -->
+            <div id="screenshotViewer" class="sync-media-viewer">
+              <div id="emptyState" class="empty-state">
+                <i class="fa-solid fa-image empty-state-icon"></i>
+                <div class="empty-state-title">No Screenshot Received</div>
+                <div class="empty-state-subtitle">
+                  Press <span class="empty-state-kbd">Ctrl + Shift + S</span> on your PC to sync instantly
+                </div>
+              </div>
+              <img id="screenshotImg" src="" alt="Latest Screenshot" class="screenshot-display-img" style="display: none;">
+            </div>
+
+            <!-- PC Question Text Panel (Ctrl+Shift+T) -->
+            <div id="pcSentTextViewer" class="pc-text-box" style="display: none;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                <span style="font-size: 0.82rem; font-weight: 700; color: var(--accent-primary);">
+                  <i class="fa-solid fa-terminal"></i> PC Clipboard Text:
+                </span>
+                <button class="btn-tool" id="btnSolvePCSentText" style="padding: 0.25rem 0.6rem; font-size: 0.78rem;">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Solve
+                </button>
+              </div>
+              <div id="pcSentTextDisplay" class="pc-text-content">
+                No question text received yet. Press Ctrl+Shift+T on your PC to send text snippets here.
+              </div>
+            </div>
+
+            <!-- Bottom Actions Bar -->
+            <div id="screenshotActions" style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn-tool" id="btnDownloadImg">
+                <i class="fa-solid fa-download"></i> Download Image
+              </button>
+              <button class="btn-send" id="btnSolveGemini">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Solve with AI
+              </button>
+            </div>
           </div>
 
-          <!-- Actions for Screenshot Tab -->
-          <div class="card-actions" id="screenshotActions">
-            <button class="btn-tool" id="btnFetchScreenshot" title="Fetch latest screenshot from Firestore (Does not trigger AI)">
-              <i class="fa-solid fa-rotate-right"></i> <span id="fetchImgLabel">Fetch</span>
-            </button>
-            <button class="btn-tool" id="btnToggleAutoDownload" title="Auto-download screenshots when received">
-              <i class="fa-solid fa-cloud-arrow-down"></i> <span id="autoDlLabel">Auto-Save: OFF</span>
-            </button>
-            <button class="btn-tool" id="btnDownloadImg" title="Download current screenshot">
-              <i class="fa-solid fa-download"></i> Save PNG
-            </button>
+          <!-- Right Column: System Instruction & AI Solution Text Editor -->
+          <div class="card dashboard-col">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-code" style="color: var(--accent-primary);"></i> Snippet / AI Output
+              </div>
+              <div id="aiSolverStatusBadge" class="status-pill pending">
+                <span id="aiSolverStatusText"><i class="fa-solid fa-robot"></i> AI Ready</span>
+              </div>
+            </div>
+
+            <!-- AI Instruction Prompt Box -->
+            <div class="config-form-group">
+              <label for="aiInstructionInput" class="config-label">
+                <i class="fa-solid fa-comment-dots" style="color: var(--accent-cyan);"></i> Prompt / Instruction:
+              </label>
+              <input type="text" id="aiInstructionInput" class="config-input" placeholder="e.g. Output ONLY clean Python code without markdown formatting">
+            </div>
+
+            <!-- Live Text & Output Box -->
+            <div class="code-editor-area">
+              <textarea id="textInput" class="code-textarea" placeholder="Paste or type text snippet to auto-sync to PC system clipboard..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-size: 0.78rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+                <i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i> Text auto-syncs to PC clipboard
+              </span>
+              <button class="btn-send" id="btnSendText">
+                <i class="fa-solid fa-paper-plane"></i> Send to PC
+              </button>
+            </div>
           </div>
 
-          <!-- Actions for PC Text Tab -->
-          <div class="card-actions" id="pcTextActions" style="display: none;">
-            <button class="btn-tool" id="btnFetchPCText" title="Fetch latest text question from Firestore (Does not trigger AI)">
-              <i class="fa-solid fa-rotate-right"></i> <span id="fetchTextLabel">Fetch Text</span>
-            </button>
-            <button class="btn-tool" id="btnSolvePCSentText" title="Solve text question with AI">
-              <i class="fa-solid fa-brain"></i> Solve Question
-            </button>
-          </div>
-        </div>
-
-        <!-- Viewport 1: Screenshot Viewer -->
-        <div class="screenshot-viewer" id="screenshotViewer">
-          <div class="empty-state" id="emptyState">
-            <i class="fa-solid fa-camera-retro"></i>
-            <p style="font-size: 0.95rem; font-weight: 700; color: var(--text-main);">No Screenshot Received</p>
-            <span class="shortcut-badge">Press Ctrl + Shift + S on PC</span>
-          </div>
-          <img id="screenshotImg" src="" alt="Screenshot" style="display: none;">
-        </div>
-
-        <!-- Viewport 2: PC Question Text Viewer (Hidden by default, shown when PC Text tab is active) -->
-        <div class="pc-text-viewer" id="pcSentTextViewer" style="display: none;">
-          <div id="pcSentTextDisplay" style="color: var(--text-muted);">No question text received yet. Press Ctrl+Shift+T on PC to send clipboard text here.</div>
         </div>
       </div>
 
-      <!-- Right Panel: Clean Solution & Clipboard Sync Area -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">
-            <i class="fa-solid fa-paper-plane"></i> Text & Clipboard Sync
+      <!-- VIEW 2: CLI DOWNLOADS -->
+      <div id="viewDownload" class="spa-view" style="display: none;">
+        <div class="config-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <!-- OS Navigation Tabs -->
+            <div class="dl-os-nav">
+              <button class="dl-os-btn active" id="osBtnWin" data-os="windows">
+                <i class="fa-brands fa-windows" style="color: #00adef;"></i> Windows
+              </button>
+              <button class="dl-os-btn" id="osBtnLinux" data-os="linux">
+                <i class="fa-brands fa-linux" style="color: #f59e0b;"></i> Linux
+              </button>
+              <button class="dl-os-btn" id="osBtnMac" data-os="mac">
+                <i class="fa-brands fa-apple"></i> macOS
+              </button>
+            </div>
+
+            <!-- Architecture Selector Pills -->
+            <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted);">Arch:</span>
+              <button class="dl-arch-pill active" id="archBtnAmd64" data-arch="amd64">x86_64 / AMD64</button>
+              <button class="dl-arch-pill" id="archBtnArm64" data-arch="arm64">ARM64</button>
+            </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <button class="btn-tool" id="btnOpenHistory" title="View Full Text History Page">
-              <i class="fa-solid fa-clock-rotate-left"></i> History Page
-            </button>
-            <div id="statusBadge" class="status-pill pending">
-              <i class="fa-solid fa-clock"></i> <span id="statusText">Pending</span>
+
+          <!-- Download Options Card Body -->
+          <div class="card" style="padding: 1.5rem; gap: 1.5rem;">
+            <!-- Windows Panel -->
+            <div id="panelWindows" class="dl-panel">
+              <div style="margin-bottom: 1.25rem;">
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Quick Install via PowerShell:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">PS&gt;</span>
+                  <span class="code-box-text" id="winPsCmd">Invoke-WebRequest -Uri https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip -OutFile ctrlv.zip; Expand-Archive ctrlv.zip -DestinationPath C:\ctrlv</span>
+                  <button class="btn-code-copy" data-target="winPsCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+
+              <div style="margin-bottom: 1.25rem;">
+                <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_windows_amd64.zip" id="winZipLink" class="dl-action-btn">
+                  <i class="fa-solid fa-file-zipper"></i> <span id="winZipBtnText">Download Portable ZIP (x64)</span>
+                </a>
+              </div>
+
+              <div>
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Add C:\ctrlv to PATH Environment Variable:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">PS&gt;</span>
+                  <span class="code-box-text" id="winPathCmd">[System.Environment]::SetEnvironmentVariable("PATH", [System.Environment]::GetEnvironmentVariable("PATH", "User") + ";C:\ctrlv", "User")</span>
+                  <button class="btn-code-copy" data-target="winPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Linux Panel -->
+            <div id="panelLinux" class="dl-panel" style="display: none;">
+              <div style="margin-bottom: 1.25rem;">
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Install Debian / Ubuntu Package via Apt:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">$</span>
+                  <span class="code-box-text" id="linuxAptCmd">wget https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb && sudo apt install ./ctrlv-cli_linux_amd64.deb</span>
+                  <button class="btn-code-copy" data-target="linuxAptCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+                <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.deb" id="linuxDebLink" class="dl-action-btn">
+                  <i class="fa-solid fa-download"></i> <span id="linuxDebBtnText">Download .deb (x64)</span>
+                </a>
+                <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_linux_amd64.rpm" id="linuxRpmLink" class="dl-action-btn secondary">
+                  <i class="fa-solid fa-download"></i> <span id="linuxRpmBtnText">Download .rpm (x64)</span>
+                </a>
+              </div>
+
+              <div>
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Configure Environment PATH:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">$</span>
+                  <span class="code-box-text" id="linuxPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.bashrc</span>
+                  <button class="btn-code-copy" data-target="linuxPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- macOS Panel -->
+            <div id="panelMac" class="dl-panel" style="display: none;">
+              <div style="margin-bottom: 1.25rem;">
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Install binary via curl:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">$</span>
+                  <span class="code-box-text" id="macCurlCmd">curl -sSfL https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz | tar -xz && sudo mv ctrlv /usr/local/bin/</span>
+                  <button class="btn-code-copy" data-target="macCurlCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+
+              <div style="margin-bottom: 1.25rem;">
+                <a href="https://github.com/Isu-Ismail/ctrlv/releases/latest/download/ctrlv-cli_darwin_amd64.tar.gz" id="macTarLink" class="dl-action-btn">
+                  <i class="fa-solid fa-file-arrow-down"></i> <span id="macTarBtnText">Download tar.gz (Intel)</span>
+                </a>
+              </div>
+
+              <div>
+                <p style="font-size: 0.88rem; font-weight: 700; margin-bottom: 0.5rem;">
+                  Configure PATH:
+                </p>
+                <div class="code-box">
+                  <span class="code-box-prompt">$</span>
+                  <span class="code-box-text" id="macPathCmd">echo 'export PATH="$PATH:/path/to/ctrlv-folder"' &gt;&gt; ~/.zshrc</span>
+                  <button class="btn-code-copy" data-target="macPathCmd"><i class="fa-regular fa-copy"></i> Copy</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: CONFIGURATION -->
+      <div id="viewConfig" class="spa-view" style="display: none;">
+        <div class="config-container">
+          <div class="card" style="gap: 1.25rem;">
+            <div class="card-header">
+              <div class="card-title" style="color: var(--accent-primary);">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Vision Assistant Settings
+              </div>
+              <div id="aiStatusBadge" class="conn-status-badge offline">
+                <i class="fa-solid fa-robot"></i> <span id="aiStatusText">AI Key Missing</span>
+              </div>
+            </div>
+
+            <!-- Free Option Notice Card -->
+            <div class="notice-banner">
+              <i class="fa-solid fa-circle-check" style="font-size: 1.1rem; flex-shrink: 0;"></i>
+              <div>
+                <strong>100% Free Option (No Credit Card Required):</strong> Select <strong>OpenRouter (Free Tier)</strong> below! Get a free key instantly at <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> with zero credit card setup.
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+              <div class="config-grid-2col">
+                <div class="config-form-group">
+                  <label for="aiProviderSelect" class="config-label">
+                    <i class="fa-solid fa-server" style="color: var(--accent-primary);"></i> AI Provider:
+                  </label>
+                  <select id="aiProviderSelect" class="config-input" style="cursor: pointer;">
+                    <option value="openrouter">OpenRouter (100% Free Tier - Recommended)</option>
+                    <option value="groq">Groq (Ultra-Fast Free Tier)</option>
+                    <option value="google">Google AI Studio (Gemini 2.0 Flash)</option>
+                  </select>
+                </div>
+
+                <div class="config-form-group">
+                  <label for="aiModelSelect" class="config-label">
+                    <i class="fa-solid fa-brain" style="color: var(--accent-purple);"></i> Model:
+                  </label>
+                  <select id="aiModelSelect" class="config-input" style="cursor: pointer;">
+                  </select>
+                </div>
+              </div>
+
+              <!-- API Key Input with Eye Toggle Icon -->
+              <div class="config-form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem;">
+                  <label for="aiApiKeyInput" class="config-label" id="apiKeyLabel">
+                    <i class="fa-solid fa-key" style="color: var(--accent-cyan);"></i> API Key:
+                  </label>
+                  <span style="font-size: 0.78rem; color: var(--text-muted);" id="getKeyLink">
+                    Get free key at <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-primary); font-weight: 700;">openrouter.ai/keys</a>
+                  </span>
+                </div>
+                <div class="key-input-wrapper">
+                  <input type="password" id="aiApiKeyInput" class="config-input" placeholder="sk-or-v1-..." style="padding-right: 2.5rem;">
+                  <button type="button" id="btnToggleKeyVis" class="key-toggle-btn">
+                    <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Code Only Checkbox -->
+              <label class="checkbox-card" for="aiCodeOnlyCheck">
+                <input type="checkbox" id="aiCodeOnlyCheck" checked>
+                <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">
+                  Clean Code Only Output (Automatically strips markdown text & explanations)
+                </span>
+              </label>
+
+              <!-- System Instruction textarea -->
+              <div class="config-form-group">
+                <label for="aiPromptInput" class="config-label">
+                  <i class="fa-solid fa-terminal" style="color: var(--accent-green);"></i> System Instruction Prompt:
+                </label>
+                <textarea id="aiPromptInput" rows="2" class="config-input" style="font-family: var(--font-mono); font-size: 0.82rem; resize: vertical;" placeholder="System prompt for AI solver..."></textarea>
+              </div>
+            </div>
+
+            <!-- Config Form Action Buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--card-border);">
+              <button class="btn-tool" style="color: var(--accent-red); border-color: rgba(239, 68, 68, 0.3);" id="btnResetAI">
+                <i class="fa-solid fa-rotate-left"></i> Reset AI Settings
+              </button>
+
+              <button class="btn-send" id="btnSaveAI" style="padding: 0.55rem 1.6rem;">
+                <i class="fa-solid fa-floppy-disk"></i> Save Settings
+              </button>
             </div>
           </div>
         </div>
-
-        <!-- Full Vertical Text Area -->
-        <div class="text-area-wrapper">
-          <textarea id="textInput" placeholder="Solution code or text will appear here automatically and copy to PC clipboard..."></textarea>
-          <div class="text-actions">
-            <span class="shortcut-badge"><i class="fa-solid fa-keyboard"></i> Ctrl + Shift + F to copy on PC</span>
-            <button class="btn-send" id="btnSendText">
-              <i class="fa-solid fa-share"></i> <span id="btnSendTextLabel">Send to PC</span>
-            </button>
-          </div>
-        </div>
       </div>
+
+    </main>
+
+    <!-- Image Preview Modal -->
+    <div id="imageModal" class="modal" style="display: none;">
+      <span id="btnCloseModal" class="modal-close">&times;</span>
+      <img id="modalImg" class="modal-content" src="" alt="Full Screen Screenshot">
     </div>
 
-    <!-- Image Fullscreen Modal -->
-    <div class="modal" id="imageModal">
-      <span class="close-modal" id="btnCloseModal">&times;</span>
-      <img class="modal-content" id="modalImg" alt="Expanded Screenshot">
-    </div>
-
-    <footer>
-      ctrlv &bull; Real-time cross-device sync & AI Vision Assistant
+    <!-- App Footer -->
+    <footer class="app-footer">
+      ctrlv &bull; Realtime Stateful Sync &amp; AI Vision Assistant
     </footer>
+
   </div>
 
-  <!-- Main JavaScript Module -->
   <script type="module" src="script.js"></script>
 </body>
-
 </html>

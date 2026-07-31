@@ -8,58 +8,87 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- External Stylesheet -->
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+
+  <!-- Modular CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="scrollable">
+<body>
 
-  <div class="container">
-    <!-- Top Header Navigation -->
-    <header>
-      <div class="brand">
-        <a href="index.html" class="brand-logo" title="Return to Dashboard"><i class="fa-solid fa-bolt"></i></a>
-        <div style="display: flex; flex-direction: column;">
-          <div class="brand-title">Sent Text History</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">
-            Room: <span class="active-room-id" id="activeRoomBadge" style="color: var(--accent-primary); font-weight: 700;">room-alpha-123</span>
+  <div class="app-shell">
+    <!-- Top Sticky Full-Width Header Bar -->
+    <header class="app-header">
+      <div class="header-inner">
+        <a href="index.html" class="brand" title="Return to Dashboard">
+          <div class="brand-logo">
+            <img src="logo.svg" alt="ctrlv logo" style="width: 22px; height: 22px; display: block;">
           </div>
-        </div>
-      </div>
-
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button class="btn-tool" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" id="btnClearAllHistory">
-          <i class="fa-solid fa-trash-can"></i> Clear All
-        </button>
-        <a href="index.html" class="btn-create-room" style="text-decoration: none;">
-          <i class="fa-solid fa-arrow-left"></i> Back to Sync
+          <div style="display: flex; flex-direction: column;">
+            <div class="brand-title">Sent Text History</div>
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">
+              Room: <strong id="activeRoomBadge" style="color: var(--accent-primary);">room-alpha-123</strong>
+            </span>
+          </div>
         </a>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <button class="btn-tool" style="color: var(--accent-red); border-color: rgba(239, 68, 68, 0.3);" id="btnClearAllHistory">
+            <i class="fa-solid fa-trash-can"></i> Clear All
+          </button>
+          <a href="index.html" class="btn-create-room" style="text-decoration: none;">
+            <i class="fa-solid fa-arrow-left"></i> Back to Sync
+          </a>
+          <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Light / Dark Theme">
+            <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
+          </button>
+        </div>
       </div>
     </header>
 
-    <!-- Master-Detail 2-Column Sidebar Layout -->
-    <div class="history-layout">
-      <!-- Left Sidebar (Item Snippets List) -->
-      <div class="history-sidebar" id="historySidebar">
-        <!-- Dynamically populated by history.js -->
-      </div>
+    <!-- Main Full-Width Content Container -->
+    <main class="app-container">
+      <div class="history-layout">
+        <!-- Sidebar Item Snippets List -->
+        <div class="history-sidebar" id="historySidebar">
+        </div>
 
-      <!-- Right Detail Panel (Full Text Box & Copy Actions) -->
-      <div class="history-detail-panel" id="historyDetailPanel">
-        <!-- Dynamically populated by history.js -->
+        <!-- Right Detail Panel -->
+        <div class="history-detail-panel" id="historyDetailPanel">
+        </div>
       </div>
-    </div>
+    </main>
 
-    <footer>
-      ctrlv &bull; Real-time cross-device sync
+    <footer class="app-footer">
+      ctrlv &bull; Realtime Cross-Device Sync
     </footer>
   </div>
 
-  <!-- JavaScript Module -->
   <script type="module" src="history.js"></script>
+  <script>
+    // Theme toggle helper script for standalone page
+    const themeBtn = document.getElementById("themeToggleBtn");
+    const themeIcon = document.getElementById("themeToggleIcon");
+    const currentTheme = localStorage.getItem("ctrlv_theme") || "dark";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+    if (themeIcon) {
+      themeIcon.className = currentTheme === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+    }
+    if (themeBtn) {
+      themeBtn.addEventListener("click", () => {
+        const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("ctrlv_theme", next);
+        if (themeIcon) {
+          themeIcon.className = next === "dark" ? "fa-solid fa-moon" : "fa-solid fa-sun";
+        }
+      });
+    }
+  </script>
 </body>
 </html>
