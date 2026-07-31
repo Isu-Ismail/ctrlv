@@ -18,6 +18,7 @@ type Message struct {
 	Content  string `json:"content,omitempty"`  // Text snippet or base64 image string
 	Browsers int    `json:"browsers,omitempty"` // Number of connected browser clients
 	CLIs     int    `json:"clis,omitempty"`     // Number of connected CLI clients
+	SenderID string `json:"sender_id,omitempty"` // Unique ID of sending client instance
 }
 
 // Room represents a stateful sync room in RAM

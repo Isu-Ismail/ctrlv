@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,16 +14,18 @@ import (
 )
 
 type RelayMessage struct {
-	Type    string `json:"type"`    // "text" or "image"
-	RoomID  string `json:"room_id"`  // e.g. "room-alpha-123"
-	Content string `json:"content"` // Text snippet or base64 image string
+	Type     string `json:"type"`              // "text" or "image"
+	RoomID   string `json:"room_id"`            // e.g. "room-alpha-123"
+	Content  string `json:"content"`           // Text snippet or base64 image string
+	SenderID string `json:"sender_id,omitempty"` // Unique ID of sending client instance
 }
 
 type RelayService struct {
-	ServerURL string
-	conn      *websocket.Conn
-	mu        sync.Mutex
-	writeMu   sync.Mutex
+	ServerURL  string
+	InstanceID string
+	conn       *websocket.Conn
+	mu         sync.Mutex
+	writeMu    sync.Mutex
 }
 
 const DefaultRelayURL = "wss://ctrlv.onrender.com/ws"
@@ -39,8 +42,10 @@ func NewRelayService(serverURL string) *RelayService {
 	if serverURL == "" {
 		serverURL = GetRelayURL()
 	}
+	instID := fmt.Sprintf("cli-%d-%d", os.Getpid(), time.Now().UnixNano()%100000)
 	return &RelayService{
-		ServerURL: serverURL,
+		ServerURL:  serverURL,
+		InstanceID: instID,
 	}
 }
 
@@ -87,7 +92,7 @@ func (rs *RelayService) VerifyConnection(roomID string) error {
 	return nil
 }
 
-func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, onNewText func(text string)) {
+func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, onNewText func(text string, senderID string)) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -102,7 +107,7 @@ func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, on
 			continue
 		}
 
-		log.Printf("[Relay] Persistent CLI socket active for room: %s", roomID)
+		log.Printf("[Relay] Persistent CLI socket active (Instance: %s) for room: %s", rs.InstanceID, roomID)
 
 		for {
 			var msg RelayMessage
@@ -116,7 +121,7 @@ func (rs *RelayService) ListenRoomUpdates(ctx context.Context, roomID string, on
 			}
 
 			if msg.Type == "text" && strings.TrimSpace(msg.Content) != "" {
-				onNewText(msg.Content)
+				onNewText(msg.Content, msg.SenderID)
 			}
 		}
 
@@ -131,9 +136,10 @@ func (rs *RelayService) SendMessage(roomID string, msgType string, content strin
 	rs.mu.Unlock()
 
 	msg := RelayMessage{
-		Type:    msgType,
-		RoomID:  roomID,
-		Content: content,
+		Type:     msgType,
+		RoomID:   roomID,
+		Content:  content,
+		SenderID: rs.InstanceID,
 	}
 
 	// 1. If persistent daemon socket is connected, write over it directly! (No duplicate socket!)

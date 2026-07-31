@@ -468,7 +468,12 @@ func runDaemon(roomID string, wantScreen bool) {
 	ctx, cancelListener := context.WithCancel(context.Background())
 	defer cancelListener()
 
-	go relayService.ListenRoomUpdates(ctx, roomID, func(rawText string) {
+	go relayService.ListenRoomUpdates(ctx, roomID, func(rawText string, senderID string) {
+		// Ignore text sent by THIS CLI instance (prevents self-echo & overlay pop!)
+		if senderID != "" && senderID == relayService.InstanceID {
+			return
+		}
+
 		cleanText := rawText
 		if len(cleanText) > 6 && cleanText[len(cleanText)-6:] == "\n/---/" {
 			cleanText = cleanText[:len(cleanText)-6]
