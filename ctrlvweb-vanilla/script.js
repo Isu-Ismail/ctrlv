@@ -4,9 +4,13 @@ import { getAIConfig, saveAIConfig, clearAIConfig } from "./config.js";
 const navBtnDashboard = document.getElementById("navBtnDashboard");
 const navBtnDownload = document.getElementById("navBtnDownload");
 const navBtnConfig = document.getElementById("navBtnConfig");
+const navBtnHistory = document.getElementById("navBtnHistory");
 const viewDashboard = document.getElementById("viewDashboard");
 const viewDownload = document.getElementById("viewDownload");
 const viewConfig = document.getElementById("viewConfig");
+const viewHistory = document.getElementById("viewHistory");
+const btnCardOpenHistory = document.getElementById("btnCardOpenHistory");
+const btnClearAllHistory = document.getElementById("btnClearAllHistory");
 const brandLogoBtn = document.getElementById("brandLogoBtn");
 
 // UI Elements: Room & Header
@@ -88,7 +92,16 @@ let isSolvingAI = false;
 let cachedImagePath = null;
 let cachedPCSentText = null;
 
+function updateHistoryLinks() {
+  const navHistory = document.getElementById("btnOpenHistoryNav");
+  const cardHistory = document.getElementById("btnOpenHistoryCard");
+  const url = `history.html?room=${encodeURIComponent(currentRoomId)}`;
+  if (navHistory) navHistory.href = url;
+  if (cardHistory) cardHistory.href = url;
+}
+
 if (roomIdInput) roomIdInput.value = currentRoomId;
+updateHistoryLinks();
 
 // Populate initial prompt from AI config
 const savedAiConfig = getAIConfig();
@@ -99,17 +112,162 @@ if (aiInstructionInput && savedAiConfig.customPrompt) {
 // -----------------------------------------------------------------------------
 // 1. SPA View Switching (Zero Page Reload = 100% Stable Connection Across Screens)
 // -----------------------------------------------------------------------------
+let selectedHistoryIdx = 0;
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+function renderHistoryView() {
+  const sidebar = document.getElementById("historySidebar");
+  const detail = document.getElementById("historyDetailPanel");
+  if (!sidebar || !detail) return;
+
+  const key = `ctrlv_history_${currentRoomId}`;
+  let history = [];
+  try {
+    const stored = localStorage.getItem(key);
+    history = stored ? JSON.parse(stored) : [];
+  } catch (e) {
+    history = [];
+  }
+
+  if (history.length === 0) {
+    const cachedPC = getCachedPCText();
+    const cachedWeb = getCachedWebText();
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const today = new Date().toLocaleDateString();
+
+    if (cachedPC && cachedPC.trim()) {
+      history.push({ text: cachedPC.trim(), time: now, date: today });
+    }
+    if (cachedWeb && cachedWeb.trim() && cachedWeb.trim() !== cachedPC.trim()) {
+      history.push({ text: cachedWeb.trim(), time: now, date: today });
+    }
+
+    if (history.length > 0) {
+      localStorage.setItem(key, JSON.stringify(history));
+    }
+  }
+
+  if (history.length === 0) {
+    sidebar.innerHTML = `
+      <div style="font-size:0.82rem; color:var(--text-muted); text-align:center; padding:1.5rem 0.5rem;">
+        No history items
+      </div>
+    `;
+    detail.innerHTML = `
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; color:var(--text-muted); text-align:center;">
+        <i class="fa-solid fa-folder-open" style="font-size:3rem; color:var(--text-muted); margin-bottom:1rem; opacity:0.5;"></i>
+        <h3 style="font-weight:700; color:var(--text-main);">No History Available</h3>
+        <p style="font-size:0.88rem; margin-top:0.5rem; max-width:320px;">Texts you send to your PC or questions received from your PC will be automatically saved here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  if (selectedHistoryIdx >= history.length) selectedHistoryIdx = 0;
+
+  sidebar.innerHTML = history.map((item, idx) => {
+    const snippet = (item.text || '').trim().split('\n')[0] || 'Empty Text';
+    const isActive = idx === selectedHistoryIdx;
+    return `
+      <div class="history-item ${isActive ? 'active' : ''}" data-idx="${idx}" style="padding:0.65rem 0.75rem; border-radius:var(--radius-sm); cursor:pointer; background:${isActive ? 'var(--bg-secondary)' : 'transparent'}; border:1px solid ${isActive ? 'var(--accent-primary)' : 'transparent'}; transition:all 0.15s ease;">
+        <div style="font-size:0.85rem; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:0.2rem;">
+          ${escapeHtml(snippet)}
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-muted); display:flex; align-items:center; gap:0.35rem;">
+          <i class="fa-regular fa-clock"></i> ${escapeHtml(item.time || 'Recent')} ${item.date ? ' &bull; ' + escapeHtml(item.date) : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  sidebar.querySelectorAll(".history-item").forEach(el => {
+    el.addEventListener("click", () => {
+      selectedHistoryIdx = parseInt(el.getAttribute("data-idx")) || 0;
+      renderHistoryView();
+    });
+  });
+
+  const selectedItem = history[selectedHistoryIdx];
+  detail.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; padding-bottom:0.75rem; border-bottom:1px solid var(--card-border);">
+      <div style="font-size:0.88rem; font-weight:700; color:var(--text-muted); display:flex; align-items:center; gap:0.5rem;">
+        <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent-primary);"></i>
+        <span>Recorded: ${escapeHtml(selectedItem.time || 'Recent')} ${selectedItem.date ? ' (' + escapeHtml(selectedItem.date) + ')' : ''}</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:0.5rem;">
+        <button class="btn-send" id="btnCopySelectedHistory" style="padding:0.35rem 0.85rem; font-size:0.8rem;">
+          <i class="fa-regular fa-copy"></i> <span id="copyHistoryLabel">Copy Text</span>
+        </button>
+        <button class="btn-tool" id="btnSendSelectedToPC" style="background:var(--accent-primary); color:white; border:none; padding:0.35rem 0.85rem; font-size:0.8rem; font-weight:700;">
+          <i class="fa-solid fa-paper-plane"></i> Send to PC
+        </button>
+        <button class="btn-tool" id="btnDeleteSelectedHistory" style="color:var(--accent-red); padding:0.35rem 0.65rem;" title="Delete this entry">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+    <textarea class="code-textarea" id="historyDetailText" style="flex:1; width:100%; min-height:450px; margin-top:0.5rem;" readonly>${escapeHtml(selectedItem.text)}</textarea>
+  `;
+
+  const btnCopy = document.getElementById("btnCopySelectedHistory");
+  if (btnCopy) {
+    btnCopy.addEventListener("click", () => {
+      navigator.clipboard.writeText(selectedItem.text).then(() => {
+        const lbl = document.getElementById("copyHistoryLabel");
+        if (lbl) lbl.textContent = "Copied!";
+        setTimeout(() => { if (lbl) lbl.textContent = "Copy Text"; }, 1800);
+      });
+    });
+  }
+
+  const btnSendPC = document.getElementById("btnSendSelectedToPC");
+  if (btnSendPC) {
+    btnSendPC.addEventListener("click", () => {
+      sendTextToRelay(selectedItem.text);
+      btnSendPC.innerHTML = `<i class="fa-solid fa-check"></i> Sent!`;
+      setTimeout(() => {
+        btnSendPC.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Send to PC`;
+      }, 1800);
+    });
+  }
+
+  const btnDelete = document.getElementById("btnDeleteSelectedHistory");
+  if (btnDelete) {
+    btnDelete.addEventListener("click", () => {
+      history.splice(selectedHistoryIdx, 1);
+      localStorage.setItem(key, JSON.stringify(history));
+      renderHistoryView();
+    });
+  }
+}
+
+if (btnClearAllHistory) {
+  btnClearAllHistory.addEventListener("click", () => {
+    const key = `ctrlv_history_${currentRoomId}`;
+    localStorage.removeItem(key);
+    selectedHistoryIdx = 0;
+    renderHistoryView();
+  });
+}
+
 function switchView(targetView) {
   activeView = targetView;
   const views = {
     dashboard: viewDashboard,
     download: viewDownload,
-    config: viewConfig
+    config: viewConfig,
+    history: viewHistory
   };
   const navBtns = {
     dashboard: navBtnDashboard,
     download: navBtnDownload,
-    config: navBtnConfig
+    config: navBtnConfig,
+    history: navBtnHistory
   };
 
   Object.keys(views).forEach(v => {
@@ -119,12 +277,16 @@ function switchView(targetView) {
 
   if (targetView === "config") {
     populateConfigUI();
+  } else if (targetView === "history") {
+    renderHistoryView();
   }
 }
 
 if (navBtnDashboard) navBtnDashboard.addEventListener("click", () => switchView("dashboard"));
 if (navBtnDownload) navBtnDownload.addEventListener("click", () => switchView("download"));
 if (navBtnConfig) navBtnConfig.addEventListener("click", () => switchView("config"));
+if (navBtnHistory) navBtnHistory.addEventListener("click", () => switchView("history"));
+if (btnCardOpenHistory) btnCardOpenHistory.addEventListener("click", () => switchView("history"));
 if (brandLogoBtn) brandLogoBtn.addEventListener("click", (e) => { e.preventDefault(); switchView("dashboard"); });
 
 // Tab Switching inside Dashboard
@@ -623,10 +785,43 @@ function parseCleanCodeOnly(rawText) {
   return rawText.trim();
 }
 
+function saveToRoomHistory(text) {
+  if (!text || !text.trim()) return;
+  try {
+    const key = `ctrlv_history_${currentRoomId}`;
+    const existing = localStorage.getItem(key);
+    let history = existing ? JSON.parse(existing) : [];
+
+    const clean = text.trim();
+    if (history.length > 0 && history[0].text === clean) {
+      return;
+    }
+
+    const newItem = {
+      text: clean,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString()
+    };
+
+    history.unshift(newItem);
+
+    if (history.length > 50) {
+      history = history.slice(0, 50);
+    }
+
+    localStorage.setItem(key, JSON.stringify(history));
+  } catch (e) {
+    console.warn("Failed to update room history:", e);
+  }
+}
+
 function sendTextToRelay(cleanText) {
-  if (!ws || ws.readyState !== WebSocket.OPEN || !cleanText) return;
+  if (!cleanText) return;
   saveCachedWebText(cleanText);
-  ws.send(JSON.stringify({ type: "web_exe", room_id: currentRoomId, content: cleanText, sender_id: "browser" }));
+  saveToRoomHistory(cleanText);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "web_exe", room_id: currentRoomId, content: cleanText, sender_id: "browser" }));
+  }
 }
 
 if (btnSolveGemini) {
@@ -685,8 +880,11 @@ function updateConnectionStatus(online) {
   if (online) {
     connStatusBadge.className = "conn-status-badge online";
     connStatusText.textContent = "Connected";
-    btnConnect.className = "btn-create-room connected";
-    btnConnectText.textContent = "Disconnect";
+    if (btnConnect) {
+      btnConnect.disabled = false;
+      btnConnect.className = "btn-create-room connected";
+    }
+    if (btnConnectText) btnConnectText.innerHTML = "Disconnect";
     if (clientCountsBadge) clientCountsBadge.style.display = "inline-flex";
     if (browserCount && (parseInt(browserCount.textContent || "0") < 1)) {
       browserCount.textContent = "1";
@@ -694,8 +892,11 @@ function updateConnectionStatus(online) {
   } else {
     connStatusBadge.className = "conn-status-badge offline";
     connStatusText.textContent = "Disconnected";
-    btnConnect.className = "btn-create-room";
-    btnConnectText.textContent = "Connect";
+    if (btnConnect) {
+      btnConnect.disabled = false;
+      btnConnect.className = "btn-create-room";
+    }
+    if (btnConnectText) btnConnectText.innerHTML = "Connect";
     if (clientCountsBadge) clientCountsBadge.style.display = "none";
   }
 }
@@ -707,11 +908,19 @@ function connectToRoom(roomId) {
 
   currentRoomId = roomId;
   localStorage.setItem("ctrlv_room_id", roomId);
+  updateHistoryLinks();
 
   cachedImagePath = null;
   cachedPCSentText = null;
 
   loadAndDisplayCachedData();
+
+  if (btnConnect) {
+    btnConnect.disabled = true;
+  }
+  if (btnConnectText) {
+    btnConnectText.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Connecting...`;
+  }
 
   const savedRelayUrl = (localStorage.getItem("ctrlv_relay_url") || "wss://ctrlv.onrender.com/ws").trim();
   const fullWsUrl = `${savedRelayUrl}?room=${encodeURIComponent(roomId)}&client=browser`;
@@ -775,6 +984,7 @@ function connectToRoom(roomId) {
               pcSentTextDisplay.value = newText;
             }
             saveCachedPCText(newText);
+            saveToRoomHistory(newText);
 
             if (autoSolveEnabled && isFreshText) {
               switchTab("pctext");
