@@ -8,7 +8,10 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
+
+	"github.com/atotto/clipboard"
 )
 
 var (
@@ -89,6 +92,13 @@ const (
 	ID_EDIT_TEXT               = 102
 	ID_STATIC_DIVIDER          = 103
 	ID_BTN_CLEAR               = 104
+	ID_BTN_COPY                = 105
+	ID_TAB_0                   = 200
+	ID_TAB_1                   = 201
+	ID_TAB_2                   = 202
+	ID_TAB_3                   = 203
+	ID_TAB_4                   = 204
+	ID_TAB_5                   = 205
 )
 
 type WNDCLASSEXW struct {
@@ -110,23 +120,32 @@ type RECT struct {
 	Left, Top, Right, Bottom int32
 }
 
+type RAMSnippetItem struct {
+	text      string
+	timestamp time.Time
+}
+
 var (
-	overlayHWND       uintptr
-	overlayEditHWND   uintptr
-	overlayStatusHWND  uintptr
-	overlayDividerHWND uintptr
-	overlayToggleBtn  uintptr
-	overlayClearBtn   uintptr
-	isCollapsed       bool
-	roomIDGlobal      string
-	fetchCount        int
+	overlayHWND        uintptr
+	overlayEditHWND    uintptr
+	overlayStatusHWND   uintptr
+	overlayDividerHWND  uintptr
+	overlayToggleBtn   uintptr
+	overlayClearBtn    uintptr
+	overlayCopyBtn     uintptr
+	overlayTabBtns     [6]uintptr
+	ramSnippets        []RAMSnippetItem = make([]RAMSnippetItem, 0, 6)
+	activeRAMTab       int              = 0
+	isCollapsed        bool
+	roomIDGlobal       string
+	fetchCount         int
 
 	hMainBgBrush    uintptr
 	hBtnBgBrush     uintptr
 	hDividerBgBrush uintptr
 	hEditBgBrush    uintptr
 
-	expandedHeight  int32 = 280
+	expandedHeight  int32 = 320
 	collapsedHeight int32 = 38
 	overlayWidth    int32 = 640
 	collapsedWidth  int32 = 100
@@ -192,10 +211,24 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			procSetBkColor.Call(hdc, uintptr(rgb(18, 18, 22)))     // Dark Translucent Glass #121216
 			procSetBkMode.Call(hdc, 2)
 			return hMainBgBrush
-		case overlayToggleBtn, overlayClearBtn:
-			// Styled Pill Buttons: Coral Red text on dark slate pill background
-			procSetTextColor.Call(hdc, uintptr(rgb(239, 68, 68)))   // Coral Red #EF4444
-			procSetBkColor.Call(hdc, uintptr(rgb(30, 34, 43)))      // Dark Slate Button #1E222B
+		case overlayToggleBtn, overlayClearBtn, overlayCopyBtn, overlayTabBtns[0], overlayTabBtns[1], overlayTabBtns[2], overlayTabBtns[3], overlayTabBtns[4], overlayTabBtns[5]:
+			// Check if this is the active tab button to highlight it
+			isActiveTab := false
+			for i := 0; i < 6; i++ {
+				if lParam == overlayTabBtns[i] && i == activeRAMTab {
+					isActiveTab = true
+					break
+				}
+			}
+			if isActiveTab {
+				// Highlight Active Tab in Emerald Green #10B981
+				procSetTextColor.Call(hdc, uintptr(rgb(16, 185, 129)))
+				procSetBkColor.Call(hdc, uintptr(rgb(30, 41, 59)))
+			} else {
+				// Styled Pill Buttons: Coral Red text on dark slate pill background
+				procSetTextColor.Call(hdc, uintptr(rgb(239, 68, 68))) // Coral Red #EF4444
+				procSetBkColor.Call(hdc, uintptr(rgb(30, 34, 43)))    // Dark Slate Button #1E222B
+			}
 			procSetBkMode.Call(hdc, 2)
 			return hBtnBgBrush
 		case overlayDividerHWND:
@@ -216,11 +249,26 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		}
 
 	case WM_COMMAND:
-		switch uint16(wParam & 0xffff) {
+		cmdID := uint16(wParam & 0xffff)
+		switch cmdID {
 		case ID_BTN_TOGGLE:
 			toggleCollapse(hwnd)
 		case ID_BTN_CLEAR:
 			clearText()
+		case ID_BTN_COPY:
+			copyActiveTabText()
+		case ID_TAB_0:
+			selectRAMTab(0)
+		case ID_TAB_1:
+			selectRAMTab(1)
+		case ID_TAB_2:
+			selectRAMTab(2)
+		case ID_TAB_3:
+			selectRAMTab(3)
+		case ID_TAB_4:
+			selectRAMTab(4)
+		case ID_TAB_5:
+			selectRAMTab(5)
 		}
 
 	case WM_SIZE:
@@ -237,6 +285,14 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			if overlayToggleBtn != 0 {
 				procMoveWindow.Call(overlayToggleBtn, 8, 6, 84, 26, 1)
 			}
+			if overlayCopyBtn != 0 {
+				procShowWindow.Call(overlayCopyBtn, 0)
+			}
+			for i := 0; i < 6; i++ {
+				if overlayTabBtns[i] != 0 {
+					procShowWindow.Call(overlayTabBtns[i], 0)
+				}
+			}
 		} else {
 			if overlayToggleBtn != 0 {
 				procMoveWindow.Call(overlayToggleBtn, uintptr(width-75), 6, 65, 26, 1)
@@ -244,14 +300,30 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			if overlayClearBtn != 0 {
 				procMoveWindow.Call(overlayClearBtn, uintptr(width-145), 6, 62, 26, 1)
 			}
+			if overlayCopyBtn != 0 {
+				procShowWindow.Call(overlayCopyBtn, 5)
+				procMoveWindow.Call(overlayCopyBtn, uintptr(width-212), 6, 62, 26, 1)
+			}
 			if overlayStatusHWND != 0 {
-				procMoveWindow.Call(overlayStatusHWND, 16, 8, uintptr(width-170), 24, 1)
+				procMoveWindow.Call(overlayStatusHWND, 16, 8, uintptr(width-235), 24, 1)
 			}
 			if overlayDividerHWND != 0 {
 				procMoveWindow.Call(overlayDividerHWND, 12, 36, uintptr(width-24), 1, 1)
 			}
+			startX := int32(12)
+			for i := 0; i < 6; i++ {
+				if overlayTabBtns[i] != 0 {
+					w := int32(52)
+					if i == 0 {
+						w = 60
+					}
+					procShowWindow.Call(overlayTabBtns[i], 5)
+					procMoveWindow.Call(overlayTabBtns[i], uintptr(startX), 42, uintptr(w), 24, 1)
+					startX += w + 5
+				}
+			}
 			if overlayEditHWND != 0 {
-				procMoveWindow.Call(overlayEditHWND, 12, 42, uintptr(width-24), uintptr(height-52), 1)
+				procMoveWindow.Call(overlayEditHWND, 12, 72, uintptr(width-24), uintptr(height-84), 1)
 			}
 		}
 
@@ -264,12 +336,31 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 	return res
 }
 
+func copyActiveTabText() {
+	if activeRAMTab < len(ramSnippets) {
+		activeText := ramSnippets[activeRAMTab].text
+		if activeText != "" {
+			if err := clipboard.WriteAll(activeText); err != nil {
+				log.Printf("[Copy Error] %v", err)
+			} else {
+				if activeRAMTab == 0 {
+					UpdateOverlayStatus("Copied Main Text to PC Clipboard!")
+				} else {
+					UpdateOverlayStatus(fmt.Sprintf("Copied Tab H%d to PC Clipboard!", activeRAMTab))
+				}
+			}
+		}
+	}
+}
+
 func clearText() {
 	if overlayEditHWND == 0 {
 		return
 	}
-	emptyStr, _ := syscall.UTF16PtrFromString("")
-	procSetWindowTextW.Call(overlayEditHWND, uintptr(unsafe.Pointer(emptyStr)))
+	if activeRAMTab < len(ramSnippets) {
+		ramSnippets = append(ramSnippets[:activeRAMTab], ramSnippets[activeRAMTab+1:]...)
+	}
+	refreshOverlayContent()
 	UpdateOverlayStatus("Text Cleared")
 }
 
@@ -281,11 +372,17 @@ func toggleCollapse(hwnd uintptr) {
 	y := rc.Top
 
 	if isCollapsed {
-		// Completely hide header status, clear button, divider line, and text editor!
+		// Completely hide header status, copy button, clear button, divider line, tab buttons, and text editor!
 		procShowWindow.Call(overlayStatusHWND, 0)  // SW_HIDE
 		procShowWindow.Call(overlayClearBtn, 0)   // SW_HIDE
+		procShowWindow.Call(overlayCopyBtn, 0)    // SW_HIDE
 		procShowWindow.Call(overlayDividerHWND, 0) // SW_HIDE
 		procShowWindow.Call(overlayEditHWND, 0)    // SW_HIDE
+		for i := 0; i < 6; i++ {
+			if overlayTabBtns[i] != 0 {
+				procShowWindow.Call(overlayTabBtns[i], 0) // SW_HIDE
+			}
+		}
 
 		// Collapse window into mini floating pill containing only the Show + button
 		procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(collapsedWidth), uintptr(collapsedHeight), 1)
@@ -297,12 +394,19 @@ func toggleCollapse(hwnd uintptr) {
 		// Unhide all components
 		procShowWindow.Call(overlayStatusHWND, 5)  // SW_SHOW
 		procShowWindow.Call(overlayClearBtn, 5)   // SW_SHOW
+		procShowWindow.Call(overlayCopyBtn, 5)    // SW_SHOW
 		procShowWindow.Call(overlayDividerHWND, 5) // SW_SHOW
 		procShowWindow.Call(overlayEditHWND, 5)    // SW_SHOW
+		for i := 0; i < 6; i++ {
+			if overlayTabBtns[i] != 0 {
+				procShowWindow.Call(overlayTabBtns[i], 5) // SW_SHOW
+			}
+		}
 
 		procMoveWindow.Call(hwnd, uintptr(x), uintptr(y), uintptr(overlayWidth), uintptr(expandedHeight), 1)
 		procMoveWindow.Call(overlayToggleBtn, uintptr(overlayWidth-75), 6, 65, 26, 1)
 		procMoveWindow.Call(overlayClearBtn, uintptr(overlayWidth-145), 6, 62, 26, 1)
+		procMoveWindow.Call(overlayCopyBtn, uintptr(overlayWidth-212), 6, 62, 26, 1)
 
 		ptr, _ := syscall.UTF16PtrFromString("Hide -")
 		procSetWindowTextW.Call(overlayToggleBtn, uintptr(unsafe.Pointer(ptr)))
@@ -374,13 +478,24 @@ func LaunchStealthOverlay(roomID string) {
 		0, uintptr(unsafe.Pointer(staticClass)),
 		uintptr(unsafe.Pointer(statusTitle)),
 		WS_CHILD|WS_VISIBLE,
-		16, 8, uintptr(overlayWidth-170), 24,
+		16, 8, uintptr(overlayWidth-235), 24,
 		hwnd, 0, 0, 0,
 	)
 	overlayStatusHWND = statusHwnd
 
-	// Clear Button
+	// Copy Pill Button
 	btnClass, _ := syscall.UTF16PtrFromString("BUTTON")
+	copyTextStr, _ := syscall.UTF16PtrFromString("Copy c")
+	copyHwnd, _, _ := procCreateWindowExW.Call(
+		0, uintptr(unsafe.Pointer(btnClass)),
+		uintptr(unsafe.Pointer(copyTextStr)),
+		WS_CHILD|WS_VISIBLE,
+		uintptr(overlayWidth-212), 6, 62, 26,
+		hwnd, uintptr(ID_BTN_COPY), 0, 0,
+	)
+	overlayCopyBtn = copyHwnd
+
+	// Clear Button
 	clearTextStr, _ := syscall.UTF16PtrFromString("Clear x")
 	clearHwnd, _, _ := procCreateWindowExW.Call(
 		0, uintptr(unsafe.Pointer(btnClass)),
@@ -412,13 +527,43 @@ func LaunchStealthOverlay(roomID string) {
 	)
 	overlayDividerHWND = divHwnd
 
+	// Font Setup for Header Label & Pill Buttons
+	headerFontName, _ := syscall.UTF16PtrFromString("Segoe UI")
+	hHeaderFont, _, _ := procCreateFontW.Call(
+		14, 0, 0, 0, 600, 0, 0, 0, 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(headerFontName)),
+	)
+
+	// Create 6 Tab Selection Pill Buttons: [Main] [H1] [H2] [H3] [H4] [H5]
+	tabLabels := []string{"Main", "H1", "H2", "H3", "H4", "H5"}
+	tabIDs := []uintptr{ID_TAB_0, ID_TAB_1, ID_TAB_2, ID_TAB_3, ID_TAB_4, ID_TAB_5}
+	tabStartX := int32(12)
+	for i := 0; i < 6; i++ {
+		tPtr, _ := syscall.UTF16PtrFromString(tabLabels[i])
+		w := int32(52)
+		if i == 0 {
+			w = 60
+		}
+		tHwnd, _, _ := procCreateWindowExW.Call(
+			0, uintptr(unsafe.Pointer(btnClass)),
+			uintptr(unsafe.Pointer(tPtr)),
+			WS_CHILD|WS_VISIBLE,
+			uintptr(tabStartX), 42, uintptr(w), 24,
+			hwnd, tabIDs[i], 0, 0,
+		)
+		overlayTabBtns[i] = tHwnd
+		if hHeaderFont != 0 {
+			procSendMessageW.Call(tHwnd, WM_SETFONT, hHeaderFont, 1)
+		}
+		tabStartX += w + 5
+	}
+
 	// Multiline TextPad Edit Control with Autowrap & Multiline Tab Stop Support
 	editClass, _ := syscall.UTF16PtrFromString("EDIT")
 	editHwnd, _, _ := procCreateWindowExW.Call(
 		0, uintptr(unsafe.Pointer(editClass)),
 		0,
 		WS_CHILD|WS_VISIBLE|WS_VSCROLL|WS_HSCROLL|ES_MULTILINE|ES_AUTOVSCROLL|ES_AUTOHSCROLL|ES_WANTRETURN,
-		12, 42, uintptr(overlayWidth-24), uintptr(expandedHeight-52),
+		12, 72, uintptr(overlayWidth-24), uintptr(expandedHeight-84),
 		hwnd, uintptr(ID_EDIT_TEXT), 0, 0,
 	)
 	overlayEditHWND = editHwnd
@@ -432,15 +577,11 @@ func LaunchStealthOverlay(roomID string) {
 		procSendMessageW.Call(editHwnd, WM_SETFONT, hFont, 1)
 	}
 
-	// Font Setup for Header Label & Pill Buttons
-	headerFontName, _ := syscall.UTF16PtrFromString("Segoe UI")
-	hHeaderFont, _, _ := procCreateFontW.Call(
-		15, 0, 0, 0, 600, 0, 0, 0, 0, 0, 0, 0, 0, uintptr(unsafe.Pointer(headerFontName)),
-	)
 	if hHeaderFont != 0 {
 		procSendMessageW.Call(statusHwnd, WM_SETFONT, hHeaderFont, 1)
 		procSendMessageW.Call(btnHwnd, WM_SETFONT, hHeaderFont, 1)
 		procSendMessageW.Call(clearHwnd, WM_SETFONT, hHeaderFont, 1)
+		procSendMessageW.Call(copyHwnd, WM_SETFONT, hHeaderFont, 1)
 	}
 
 	// Set Tab Stops for clean indentations (4 spaces = 16 dialog units)
@@ -462,6 +603,63 @@ func LaunchStealthOverlay(roomID string) {
 	}
 }
 
+func selectRAMTab(idx int) {
+	if idx < 0 || idx >= 6 {
+		return
+	}
+	activeRAMTab = idx
+	refreshOverlayContent()
+}
+
+func refreshOverlayContent() {
+	if overlayEditHWND == 0 {
+		return
+	}
+	var dispText string
+	var timeStr string
+	if activeRAMTab < len(ramSnippets) {
+		dispText = ramSnippets[activeRAMTab].text
+		timeStr = ramSnippets[activeRAMTab].timestamp.Format("15:04:05")
+	} else {
+		dispText = ""
+	}
+
+	ptr, err := syscall.UTF16PtrFromString(dispText)
+	if err == nil {
+		procSetWindowTextW.Call(overlayEditHWND, uintptr(unsafe.Pointer(ptr)))
+	}
+
+	for i := 0; i < 6; i++ {
+		if overlayTabBtns[i] != 0 {
+			var label string
+			if i == 0 {
+				label = "Main"
+			} else {
+				label = fmt.Sprintf("H%d", i)
+			}
+			if i == activeRAMTab {
+				label = "[" + label + "]"
+			}
+			lPtr, _ := syscall.UTF16PtrFromString(label)
+			procSetWindowTextW.Call(overlayTabBtns[i], uintptr(unsafe.Pointer(lPtr)))
+		}
+	}
+
+	if activeRAMTab == 0 {
+		if timeStr != "" {
+			UpdateOverlayStatus(fmt.Sprintf("Main Text (%s)", timeStr))
+		} else {
+			UpdateOverlayStatus(fmt.Sprintf("Main Text (#%d in RAM)", len(ramSnippets)))
+		}
+	} else {
+		if activeRAMTab < len(ramSnippets) {
+			UpdateOverlayStatus(fmt.Sprintf("Viewing H%d (%s)", activeRAMTab, timeStr))
+		} else {
+			UpdateOverlayStatus(fmt.Sprintf("History H%d (Empty)", activeRAMTab))
+		}
+	}
+}
+
 func UpdateOverlayText(text string) {
 	if overlayEditHWND == 0 {
 		return
@@ -480,19 +678,19 @@ func UpdateOverlayText(text string) {
 	cleanText = strings.ReplaceAll(cleanText, "\r\n", "\n")
 	cleanText = strings.ReplaceAll(cleanText, "\n", "\r\n")
 
-	ptr, err := syscall.UTF16PtrFromString(cleanText)
-	if err == nil {
-		procSetWindowTextW.Call(overlayEditHWND, uintptr(unsafe.Pointer(ptr)))
+	// Push to top of RAM queue with timestamp (max 6 items)
+	newItem := RAMSnippetItem{
+		text:      cleanText,
+		timestamp: time.Now(),
+	}
+	ramSnippets = append([]RAMSnippetItem{newItem}, ramSnippets...)
+	if len(ramSnippets) > 6 {
+		ramSnippets = ramSnippets[:6]
 	}
 
-	// Update Status Header with Received Count
-	if overlayStatusHWND != 0 {
-		statusText := fmt.Sprintf("ctrlv [%s] • Text Received (#%d)", roomIDGlobal, fetchCount)
-		statusPtr, err := syscall.UTF16PtrFromString(statusText)
-		if err == nil {
-			procSetWindowTextW.Call(overlayStatusHWND, uintptr(unsafe.Pointer(statusPtr)))
-		}
-	}
+	// Automatically switch to Main tab (0) on new text arrival
+	activeRAMTab = 0
+	refreshOverlayContent()
 }
 
 func UpdateOverlayStatus(statusMsg string) {
