@@ -71,8 +71,10 @@ func TestAICredentials(cfg *AIConfig) error {
 	switch cfg.Provider {
 	case "openrouter":
 		endpoint := "https://openrouter.ai/api/v1/chat/completions"
+		maxTok := 50
 		reqBody := map[string]interface{}{
-			"model": cfg.Model,
+			"model":      cfg.Model,
+			"max_tokens": maxTok,
 			"messages": []map[string]string{
 				{"role": "user", "content": "ping"},
 			},

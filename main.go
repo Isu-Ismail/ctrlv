@@ -212,12 +212,12 @@ func spawnBackgroundStandalone(wantScreen bool) {
 	fmt.Println("==================================================")
 	fmt.Println("       ctrlv Standalone Direct AI Service         ")
 	fmt.Println("==================================================")
-	fmt.Println(" Loading AI Configuration (~/.ctrlv/ai_config.json)...")
+	fmt.Printf(" Loading AI Configuration (%s)...\n", service.GetConfigPath())
 
 	cfg, err := service.LoadAIConfig()
 	if err != nil {
 		fmt.Printf("[Error] %v\n", err)
-		fmt.Println("Please edit your credentials in ~/.ctrlv/ai_config.json and run 'ctrlv standalone' again.")
+		fmt.Printf("Please edit your credentials in %s and run 'ctrlv standalone' again.\n", service.GetConfigPath())
 		os.Exit(1)
 	}
 
@@ -227,7 +227,7 @@ func spawnBackgroundStandalone(wantScreen bool) {
 
 	if err := service.TestAICredentials(cfg); err != nil {
 		fmt.Printf("[Error] AI API Ping test failed: %v\n", err)
-		fmt.Println("Please check your API key in ~/.ctrlv/ai_config.json")
+		fmt.Printf("Please check your API key in %s\n", service.GetConfigPath())
 		os.Exit(1)
 	}
 
