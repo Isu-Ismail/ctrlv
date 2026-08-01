@@ -739,7 +739,6 @@ function connectToRoom(roomId) {
         } else if (msg.type === "image" && msg.content) {
           const newImg = msg.content;
           const isFreshImage = (newImg !== cachedImagePath);
-          const isFirstLoad = (cachedImagePath === null);
           
           cachedImagePath = newImg;
           screenshotImg.src = newImg;
@@ -747,15 +746,16 @@ function connectToRoom(roomId) {
           if (emptyState) emptyState.style.display = "none";
           saveCachedScreenshot(newImg);
 
-          if (isFreshImage && !isFirstLoad) {
+          if (isFreshImage) {
             if (autoDownload) {
               downloadImage(newImg, `ctrlv-${currentRoomId}-${Date.now()}.png`);
             }
-            if (autoSolveEnabled) {
-              switchTab("screenshot");
-              const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
-              solveImageWithGemini(newImg, prompt);
-            }
+          }
+
+          if (autoSolveEnabled && isFreshImage) {
+            switchTab("screenshot");
+            const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
+            solveImageWithGemini(newImg, prompt);
           }
         } else if ((msg.type === "exe_web" || msg.type === "text" || msg.type === "web_exe") && msg.content) {
           const newText = msg.content;
@@ -765,20 +765,18 @@ function connectToRoom(roomId) {
             }
             saveCachedWebText(newText);
           } else if (msg.type === "exe_web" || msg.type === "text") {
-            if (newText !== cachedPCSentText) {
-              const isFirstLoad = (cachedPCSentText === null);
-              cachedPCSentText = newText;
+            const isFreshText = (newText !== cachedPCSentText);
+            cachedPCSentText = newText;
 
-              if (pcSentTextDisplay) {
-                pcSentTextDisplay.value = newText;
-              }
-              saveCachedPCText(newText);
+            if (pcSentTextDisplay) {
+              pcSentTextDisplay.value = newText;
+            }
+            saveCachedPCText(newText);
 
-              if (autoSolveEnabled && !isFirstLoad) {
-                switchTab("pctext");
-                const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
-                solveTextWithGemini(newText, prompt);
-              }
+            if (autoSolveEnabled && isFreshText) {
+              switchTab("pctext");
+              const prompt = aiInstructionInput ? aiInstructionInput.value.trim() : "";
+              solveTextWithGemini(newText, prompt);
             }
           }
         }
