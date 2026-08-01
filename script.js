@@ -220,8 +220,11 @@ function loadAndDisplayCachedData() {
   }
 
   const cachedPC = getCachedPCText();
-  if (pcSentTextDisplay && cachedPC) {
-    pcSentTextDisplay.value = cachedPC;
+  if (cachedPC && cachedPC.trim() !== "") {
+    cachedPCSentText = cachedPC;
+    if (pcSentTextDisplay) {
+      pcSentTextDisplay.value = cachedPC;
+    }
   }
 }
 
