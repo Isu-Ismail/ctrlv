@@ -397,7 +397,7 @@ async function solveImageWithGemini(b64ImageData, promptText) {
         },
         body: JSON.stringify({
           model: model,
-          max_tokens: 2048,
+          max_tokens: parseInt(aiConfig.maxTokens) || 2048,
           messages: [
             {
               role: "user",
@@ -543,7 +543,7 @@ async function solveTextWithGemini(questionText, promptText) {
         },
         body: JSON.stringify({
           model: model,
-          max_tokens: 2048,
+          max_tokens: parseInt(aiConfig.maxTokens) || 2048,
           messages: [{ role: "user", content: fullTextPrompt }]
         })
       });
@@ -911,6 +911,7 @@ if (btnCloseModal) {
 const aiProviderSelect = document.getElementById("aiProviderSelect");
 const aiModelInput = document.getElementById("aiModelInput");
 const aiApiKeyInput = document.getElementById("aiApiKeyInput");
+const aiMaxTokensInput = document.getElementById("aiMaxTokensInput");
 const aiCodeOnlyCheck = document.getElementById("aiCodeOnlyCheck");
 const aiPromptInput = document.getElementById("aiPromptInput");
 const relayUrlInput = document.getElementById("relayUrlInput");
@@ -924,6 +925,7 @@ function populateConfigUI() {
   if (aiProviderSelect) aiProviderSelect.value = cfg.provider || "auto";
   if (aiModelInput) aiModelInput.value = cfg.model || "openrouter/auto";
   if (aiApiKeyInput) aiApiKeyInput.value = cfg.apiKey || "";
+  if (aiMaxTokensInput) aiMaxTokensInput.value = cfg.maxTokens || 2048;
   if (aiCodeOnlyCheck) aiCodeOnlyCheck.checked = cfg.codeOnly !== false;
   if (aiPromptInput) aiPromptInput.value = cfg.customPrompt || "";
 
@@ -950,11 +952,12 @@ if (btnSaveAI) {
     const provider = aiProviderSelect ? aiProviderSelect.value : "auto";
     const model = aiModelInput ? aiModelInput.value.trim() : "openrouter/auto";
     const apiKey = aiApiKeyInput ? aiApiKeyInput.value.trim() : "";
+    const maxTokens = aiMaxTokensInput ? parseInt(aiMaxTokensInput.value) || 2048 : 2048;
     const codeOnly = aiCodeOnlyCheck ? aiCodeOnlyCheck.checked : true;
     const customPrompt = aiPromptInput ? aiPromptInput.value.trim() : "";
     const relayUrl = relayUrlInput ? relayUrlInput.value.trim() : "";
 
-    saveAIConfig(provider, apiKey, model, codeOnly, customPrompt);
+    saveAIConfig(provider, apiKey, model, codeOnly, customPrompt, maxTokens);
 
     if (relayUrl) {
       localStorage.setItem("ctrlv_relay_url", relayUrl);

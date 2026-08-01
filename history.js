@@ -5,7 +5,7 @@ import { getFirebaseConfig } from "./config.js";
 const firebaseConfig = getFirebaseConfig();
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
+ 
 // Get Room ID from URL parameters or localStorage
 const urlParams = new URLSearchParams(window.location.search);
 let currentRoomId = urlParams.get("room") || localStorage.getItem("ctrlv_room_id") || "room-alpha-123";
