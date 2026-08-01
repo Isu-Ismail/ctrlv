@@ -83,7 +83,7 @@
           </div>
           <div class="flex flex-col leading-tight">
             <span class="font-black text-base sm:text-lg tracking-tight text-[var(--text-main)]">ctrlv</span>
-            <span class="text-[10px] sm:text-xs font-extrabold text-[var(--text-muted)] opacity-85 hidden sm:inline">v1.1.0</span>
+            <span class="text-[10px] sm:text-xs font-extrabold text-[var(--text-muted)] opacity-85 hidden sm:inline">v1.0.0</span>
           </div>
         </button>
 
