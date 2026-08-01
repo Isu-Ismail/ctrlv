@@ -637,7 +637,7 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  ctrlv config             Open ctrlv_config.json in text editor (notepad/nano/saved editor)")
 	fmt.Println("  ctrlv config -e <editor>  Set preferred editor (e.g. code, notepad, nano) & open config")
-	fmt.Println("  ctrlv standalone        Run Direct AI mode (Direct 1-second AI solve)")
+	fmt.Println("  ctrlv standalone        Run Direct AI mode (Direct AI solve)")
 	fmt.Println("  ctrlv standalone -s     Run Direct AI mode + Screen-Share Invisible Overlay Notepad")
 	fmt.Println("  ctrlv -r <roomid>       Start Room sync background service (Zero-Config Relay)")
 	fmt.Println("  ctrlv -r <roomid> -s    Start Room sync + Stealth Overlay Notepad")
