@@ -91,7 +91,9 @@ func (h *Hub) StartCleanupWorker() {
 }
 
 func (r *Room) BroadcastStats() {
+	var deadConns []*websocket.Conn
 	var browsers, clis int
+
 	for _, cType := range r.Clients {
 		if cType == "cli" {
 			clis++
@@ -106,7 +108,14 @@ func (r *Room) BroadcastStats() {
 		CLIs:     clis,
 	}
 	for client := range r.Clients {
-		_ = client.WriteJSON(statsMsg)
+		if err := client.WriteJSON(statsMsg); err != nil {
+			deadConns = append(deadConns, client)
+		}
+	}
+	if len(deadConns) > 0 {
+		for _, dc := range deadConns {
+			delete(r.Clients, dc)
+		}
 	}
 }
 
