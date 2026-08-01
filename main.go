@@ -254,7 +254,7 @@ func main() {
 	}
 
 	fmt.Printf("==================================================\n")
-	fmt.Printf("   ctrlv Stateful WebSocket Relay Server v1.1.0  \n")
+	fmt.Printf("   ctrlv Stateful WebSocket Relay Server v1.0.0  \n")
 	fmt.Printf("   Port: %s | Zero-Auth | Auto-Cleanup & Purge   \n", port)
 	fmt.Printf("==================================================\n")
 	log.Fatal(http.ListenAndServe(":"+port, nil))
