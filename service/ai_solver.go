@@ -43,7 +43,8 @@ func SolveScreenshotDirect(cfg *AIConfig, b64ImageData string) (string, error) {
 		endpoint := "https://openrouter.ai/api/v1/chat/completions"
 
 		reqBody := map[string]interface{}{
-			"model": model,
+			"model":      model,
+			"max_tokens": 2048,
 			"messages": []map[string]interface{}{
 				{
 					"role": "user",
@@ -242,7 +243,8 @@ func SolveTextDirect(cfg *AIConfig, questionText string) (string, error) {
 		endpoint := "https://openrouter.ai/api/v1/chat/completions"
 
 		reqBody := map[string]interface{}{
-			"model": model,
+			"model":      model,
+			"max_tokens": 2048,
 			"messages": []map[string]string{
 				{"role": "user", "content": fullPrompt},
 			},

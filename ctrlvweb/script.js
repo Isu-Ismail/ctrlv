@@ -397,6 +397,7 @@ async function solveImageWithGemini(b64ImageData, promptText) {
         },
         body: JSON.stringify({
           model: model,
+          max_tokens: 2048,
           messages: [
             {
               role: "user",
@@ -542,6 +543,7 @@ async function solveTextWithGemini(questionText, promptText) {
         },
         body: JSON.stringify({
           model: model,
+          max_tokens: 2048,
           messages: [{ role: "user", content: fullTextPrompt }]
         })
       });
