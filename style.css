@@ -1,8 +1,0 @@
-/* Master CSS Aggregator for ctrlvweb */
-@import url('css/variables.css');
-@import url('css/base.css');
-@import url('css/components.css');
-@import url('css/dashboard.css');
-@import url('css/config.css');
-@import url('css/download.css');
-@import url('css/history.css');
