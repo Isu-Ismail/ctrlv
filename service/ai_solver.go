@@ -42,9 +42,14 @@ func SolveScreenshotDirect(cfg *AIConfig, b64ImageData string) (string, error) {
 		}
 		endpoint := "https://openrouter.ai/api/v1/chat/completions"
 
+		maxTok := cfg.MaxTokens
+		if maxTok <= 0 {
+			maxTok = 2048
+		}
+
 		reqBody := map[string]interface{}{
 			"model":      model,
-			"max_tokens": 2048,
+			"max_tokens": maxTok,
 			"messages": []map[string]interface{}{
 				{
 					"role": "user",
@@ -242,9 +247,14 @@ func SolveTextDirect(cfg *AIConfig, questionText string) (string, error) {
 		}
 		endpoint := "https://openrouter.ai/api/v1/chat/completions"
 
+		maxTok := cfg.MaxTokens
+		if maxTok <= 0 {
+			maxTok = 2048
+		}
+
 		reqBody := map[string]interface{}{
 			"model":      model,
-			"max_tokens": 2048,
+			"max_tokens": maxTok,
 			"messages": []map[string]string{
 				{"role": "user", "content": fullPrompt},
 			},

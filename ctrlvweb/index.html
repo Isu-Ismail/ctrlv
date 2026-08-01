@@ -400,6 +400,14 @@
                 </div>
               </div>
 
+              <!-- Max Output Tokens Input -->
+              <div class="config-form-group">
+                <label for="aiMaxTokensInput" class="config-label">
+                  <i class="fa-solid fa-gauge-high" style="color: var(--accent-orange);"></i> Max Output Tokens Limit (Prevents 402 Credit Errors):
+                </label>
+                <input type="number" id="aiMaxTokensInput" class="config-input" min="256" max="65536" step="256" value="2048" placeholder="Default: 2048">
+              </div>
+
               <!-- Code Only Checkbox -->
               <label class="checkbox-card" for="aiCodeOnlyCheck">
                 <input type="checkbox" id="aiCodeOnlyCheck" checked>

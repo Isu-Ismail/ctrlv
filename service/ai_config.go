@@ -16,6 +16,7 @@ type AIConfig struct {
 	APIKey       string `json:"api_key"`       // API key string
 	Model        string `json:"model"`         // e.g. "openrouter/auto", "google/gemini-2.0-flash-exp:free", "gemini-2.0-flash"
 	CustomPrompt string `json:"custom_prompt"` // Instructions for vision AI
+	MaxTokens    int    `json:"max_tokens"`    // Max output tokens limit
 	CodeOnly     bool   `json:"code_only"`     // Strip markdown code fences
 }
 
@@ -48,6 +49,9 @@ func SaveAIConfig(cfg *AIConfig) error {
 	}
 	if cfg.CustomPrompt != "" {
 		appCfg.CustomPrompt = cfg.CustomPrompt
+	}
+	if cfg.MaxTokens > 0 {
+		appCfg.MaxTokens = cfg.MaxTokens
 	}
 	return SaveAppConfig(appCfg)
 }

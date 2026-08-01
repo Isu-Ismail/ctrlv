@@ -14,6 +14,7 @@ type AppConfig struct {
 	APIKey       string `json:"api_key"`
 	Model        string `json:"model"`
 	CustomPrompt string `json:"custom_prompt,omitempty"`
+	MaxTokens    int    `json:"max_tokens,omitempty"`
 	RelayURL     string `json:"relay_url"`
 	Editor       string `json:"editor,omitempty"`
 }
@@ -35,6 +36,7 @@ func EnsureConfigExists() (string, *AppConfig, error) {
 			APIKey:       "",
 			Model:        "openrouter/auto",
 			CustomPrompt: "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
+			MaxTokens:    2048,
 			RelayURL:     "wss://ctrlv.onrender.com/ws",
 			Editor:       "",
 		}
@@ -69,6 +71,9 @@ func LoadAppConfig() (*AppConfig, error) {
 	if strings.TrimSpace(cfg.CustomPrompt) == "" {
 		cfg.CustomPrompt = "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting."
 	}
+	if cfg.MaxTokens <= 0 {
+		cfg.MaxTokens = 2048
+	}
 
 	return &cfg, nil
 }
@@ -87,11 +92,16 @@ func (c *AppConfig) ToAIConfig() *AIConfig {
 	if prompt == "" {
 		prompt = "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting."
 	}
+	maxTok := c.MaxTokens
+	if maxTok <= 0 {
+		maxTok = 2048
+	}
 	return &AIConfig{
 		Provider:     "openrouter",
 		APIKey:       c.APIKey,
 		Model:        c.Model,
 		CustomPrompt: prompt,
+		MaxTokens:    maxTok,
 		CodeOnly:     true,
 	}
 }
