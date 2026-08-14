@@ -64,6 +64,11 @@
   let facingMode: 'environment' | 'user' = 'environment';
   let isCameraActive = false;
   let cameraError = '';
+  let isLandscapeMode = false;
+
+  function toggleLandscapeMode() {
+    isLandscapeMode = !isLandscapeMode;
+  }
 
   async function startCamera() {
     stopCamera();
@@ -506,6 +511,19 @@
             </button>
 
             <button
+              on:click={toggleLandscapeMode}
+              class={`px-2.5 py-1.5 rounded-md text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
+                isLandscapeMode
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/40 shadow-sm'
+                  : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-[var(--card-border)] hover:text-[var(--text-main)]'
+              }`}
+              title="Toggle Landscape Viewport (Wide 16:9 view rectangle)"
+            >
+              <i class="fa-solid fa-expand"></i>
+              <span>{isLandscapeMode ? 'Landscape' : 'Fit'}</span>
+            </button>
+
+            <button
               on:click={toggleAutoDownloadCamera}
               class={`flex-1 sm:flex-none justify-center px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
                 autoDownloadCamera
@@ -589,14 +607,29 @@
               </button>
             </div>
           {:else}
-            <!-- Live Video Stream -->
-            <video
-              bind:this={videoElement}
-              autoplay
-              playsinline
-              muted
-              class="max-h-full max-w-full object-contain rounded-lg shadow"
-            ></video>
+            <!-- Persistent Live Video Stream (Class Toggles smoothly without destroying video element!) -->
+            <div
+              class={`relative flex items-center justify-center transition-all duration-300 ${
+                isLandscapeMode
+                  ? 'w-full max-h-[220px] sm:max-h-[300px] aspect-[16/9] bg-black/90 rounded-lg overflow-hidden border border-amber-500/30 shadow-inner'
+                  : 'max-h-full max-w-full'
+              }`}
+            >
+              <video
+                bind:this={videoElement}
+                autoplay
+                playsinline
+                muted
+                class={`rounded-lg shadow transition-all duration-300 ${
+                  isLandscapeMode ? 'w-full h-full object-cover' : 'max-h-full max-w-full object-contain'
+                }`}
+              ></video>
+              {#if isLandscapeMode}
+                <span class="absolute top-2 left-2 bg-black/70 backdrop-blur-md text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30 shadow pointer-events-none">
+                  16:9 Landscape Viewport
+                </span>
+              {/if}
+            </div>
           {/if}
         </div>
       {:else}
