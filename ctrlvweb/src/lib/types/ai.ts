@@ -1,4 +1,4 @@
-export type AIProvider = 'auto' | 'openrouter' | 'groq' | 'google';
+export type AIProvider = 'auto' | 'openrouter' | 'groq' | 'google' | 'openai';
 
 export interface AIConfig {
   provider: AIProvider;

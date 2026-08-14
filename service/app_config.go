@@ -11,8 +11,9 @@ import (
 )
 
 type AppConfig struct {
-	APIKey       string `json:"api_key"`
-	Model        string `json:"model"`
+	Provider     string `json:"provider,omitempty"` // "google", "openrouter", "openai", "groq"
+	APIKey       string `json:"api_key"`            // Your AI Provider API Key
+	Model        string `json:"model"`              // Model name (e.g. "openrouter/auto", "gemini-2.0-flash", "gpt-4o-mini", "llama-3.2-11b-vision-preview")
 	CustomPrompt string `json:"custom_prompt,omitempty"`
 	MaxTokens    int    `json:"max_tokens,omitempty"`
 	RelayURL     string `json:"relay_url"`
@@ -33,6 +34,7 @@ func EnsureConfigExists() (string, *AppConfig, error) {
 	configPath := GetConfigPath()
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		defaultCfg := &AppConfig{
+			Provider:     "openrouter",
 			APIKey:       "",
 			Model:        "openrouter/auto",
 			CustomPrompt: "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
@@ -65,7 +67,10 @@ func LoadAppConfig() (*AppConfig, error) {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", configPath, err)
 	}
 
-	if cfg.Model == "" {
+	if strings.TrimSpace(cfg.Provider) == "" {
+		cfg.Provider = "openrouter"
+	}
+	if strings.TrimSpace(cfg.Model) == "" {
 		cfg.Model = "openrouter/auto"
 	}
 	if strings.TrimSpace(cfg.CustomPrompt) == "" {
@@ -96,10 +101,41 @@ func (c *AppConfig) ToAIConfig() *AIConfig {
 	if maxTok <= 0 {
 		maxTok = 2048
 	}
+
+	provider := strings.ToLower(strings.TrimSpace(c.Provider))
+	apiKey := strings.TrimSpace(c.APIKey)
+
+	// Auto-detect provider if missing or set to "auto"
+	if provider == "" || provider == "auto" {
+		if strings.HasPrefix(apiKey, "gsk_") {
+			provider = "groq"
+		} else if strings.HasPrefix(apiKey, "AIza") {
+			provider = "google"
+		} else if strings.HasPrefix(apiKey, "sk-proj-") || (strings.HasPrefix(apiKey, "sk-") && !strings.HasPrefix(apiKey, "sk-or-")) {
+			provider = "openai"
+		} else {
+			provider = "openrouter"
+		}
+	}
+
+	model := strings.TrimSpace(c.Model)
+	if model == "" {
+		switch provider {
+		case "google":
+			model = "gemini-2.0-flash"
+		case "openai":
+			model = "gpt-4o-mini"
+		case "groq":
+			model = "llama-3.2-11b-vision-preview"
+		default:
+			model = "openrouter/auto"
+		}
+	}
+
 	return &AIConfig{
-		Provider:     "openrouter",
+		Provider:     provider,
 		APIKey:       c.APIKey,
-		Model:        c.Model,
+		Model:        model,
 		CustomPrompt: prompt,
 		MaxTokens:    maxTok,
 		CodeOnly:     true,
@@ -107,21 +143,41 @@ func (c *AppConfig) ToAIConfig() *AIConfig {
 }
 
 func OpenConfigInEditor(editorOverride string) error {
-	configPath, cfg, err := EnsureConfigExists()
-	if err != nil {
-		return fmt.Errorf("unable to ensure config file exists: %w", err)
+	configPath := GetConfigPath()
+
+	// Ensure directory & file exist on disk even if corrupted
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		defaultCfg := &AppConfig{
+			Provider:     "openrouter",
+			APIKey:       "",
+			Model:        "openrouter/auto",
+			CustomPrompt: "Solve the problem shown in this screenshot. Output ONLY clean, working code without explanations or markdown formatting.",
+			MaxTokens:    2048,
+			RelayURL:     "wss://ctrlv.onrender.com/ws",
+			Editor:       "",
+		}
+		_ = SaveAppConfig(defaultCfg)
+	}
+
+	cfg, parseErr := LoadAppConfig()
+	if parseErr != nil {
+		fmt.Printf("[Notice] Config file has formatting issues (%v).\n[Notice] Opening %s in editor so you can fix it...\n", parseErr, configPath)
 	}
 
 	if editorOverride != "" {
-		cfg.Editor = strings.TrimSpace(editorOverride)
-		if err := SaveAppConfig(cfg); err != nil {
-			fmt.Printf("[Warning] Failed to save editor preference to config: %v\n", err)
-		} else {
+		if cfg != nil {
+			cfg.Editor = strings.TrimSpace(editorOverride)
+			_ = SaveAppConfig(cfg)
 			fmt.Printf("[Config] Saved preferred editor: '%s'\n", cfg.Editor)
 		}
 	}
 
-	editorToUse := strings.TrimSpace(cfg.Editor)
+	var editorToUse string
+	if cfg != nil && strings.TrimSpace(cfg.Editor) != "" {
+		editorToUse = strings.TrimSpace(cfg.Editor)
+	} else if editorOverride != "" {
+		editorToUse = strings.TrimSpace(editorOverride)
+	}
 
 	if editorToUse != "" {
 		err := runEditorCommand(editorToUse, configPath)

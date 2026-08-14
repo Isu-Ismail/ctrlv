@@ -96,6 +96,65 @@ func SolveScreenshotDirect(cfg *AIConfig, b64ImageData string) (string, error) {
 
 		generatedText = resStruct.Choices[0].Message.Content
 
+	case "openai":
+		model := cfg.Model
+		if model == "" {
+			model = "gpt-4o-mini"
+		}
+		endpoint := "https://api.openai.com/v1/chat/completions"
+
+		maxTok := cfg.MaxTokens
+		if maxTok <= 0 {
+			maxTok = 2048
+		}
+
+		reqBody := map[string]interface{}{
+			"model":      model,
+			"max_tokens": maxTok,
+			"messages": []map[string]interface{}{
+				{
+					"role": "user",
+					"content": []map[string]interface{}{
+						{"type": "text", "text": prompt},
+						{"type": "image_url", "image_url": map[string]string{"url": fullB64Url}},
+					},
+				},
+			},
+		}
+
+		bodyBytes, _ := json.Marshal(reqBody)
+		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("OpenAI API request error: %w", err)
+		}
+		defer resp.Body.Close()
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("OpenAI API error (HTTP %d): %s", resp.StatusCode, string(respBytes))
+		}
+
+		var resStruct struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+
+		if err := json.Unmarshal(respBytes, &resStruct); err != nil || len(resStruct.Choices) == 0 {
+			return "", fmt.Errorf("failed to parse OpenAI response: %s", string(respBytes))
+		}
+
+		generatedText = resStruct.Choices[0].Message.Content
+
 	case "groq":
 		model := cfg.Model
 		if model == "" {
@@ -291,6 +350,59 @@ func SolveTextDirect(cfg *AIConfig, questionText string) (string, error) {
 
 		if err := json.Unmarshal(respBytes, &resStruct); err != nil || len(resStruct.Choices) == 0 {
 			return "", fmt.Errorf("failed to parse OpenRouter response: %s", string(respBytes))
+		}
+
+		generatedText = resStruct.Choices[0].Message.Content
+
+	case "openai":
+		model := cfg.Model
+		if model == "" {
+			model = "gpt-4o-mini"
+		}
+		endpoint := "https://api.openai.com/v1/chat/completions"
+
+		maxTok := cfg.MaxTokens
+		if maxTok <= 0 {
+			maxTok = 2048
+		}
+
+		reqBody := map[string]interface{}{
+			"model":      model,
+			"max_tokens": maxTok,
+			"messages": []map[string]string{
+				{"role": "user", "content": fullPrompt},
+			},
+		}
+
+		bodyBytes, _ := json.Marshal(reqBody)
+		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", fmt.Errorf("OpenAI API request error: %w", err)
+		}
+		defer resp.Body.Close()
+
+		respBytes, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("OpenAI API error (HTTP %d): %s", resp.StatusCode, string(respBytes))
+		}
+
+		var resStruct struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+
+		if err := json.Unmarshal(respBytes, &resStruct); err != nil || len(resStruct.Choices) == 0 {
+			return "", fmt.Errorf("failed to parse OpenAI response: %s", string(respBytes))
 		}
 
 		generatedText = resStruct.Choices[0].Message.Content

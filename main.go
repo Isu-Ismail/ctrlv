@@ -373,7 +373,7 @@ func runStandaloneDaemonWorker(wantScreen bool) {
 	}
 	defer ipcServer.Stop()
 
-	hotkeyHandler := service.NewHotkeyHandler(onScreenshot, func() {}, onSendText)
+	hotkeyHandler := service.NewHotkeyHandler(onScreenshot, func() {}, onSendText, service.ToggleOverlayVisibility)
 	go hotkeyHandler.Start()
 	defer hotkeyHandler.Stop()
 
@@ -616,7 +616,7 @@ func runDaemon(roomID string, wantScreen bool) {
 	}
 	defer ipcServer.Stop()
 
-	hotkeyHandler := service.NewHotkeyHandler(onScreenshot, onFetchText, onSendText)
+	hotkeyHandler := service.NewHotkeyHandler(onScreenshot, onFetchText, onSendText, service.ToggleOverlayVisibility)
 	go hotkeyHandler.Start()
 	defer hotkeyHandler.Stop()
 

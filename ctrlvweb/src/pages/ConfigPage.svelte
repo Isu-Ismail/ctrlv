@@ -122,6 +122,7 @@
               >OpenRouter (Supports ALL Models: OpenAI, Claude, DeepSeek, Llama,
               Gemini)</option
             >
+            <option value="openai">OpenAI (Direct: GPT-4o, GPT-4o-mini)</option>
             <option value="groq">Groq (Ultra-Fast Free Tier)</option>
             <option value="google">Google AI Studio (Gemini Direct Key)</option>
           </select>

@@ -137,6 +137,7 @@ var (
 	ramSnippets        []RAMSnippetItem = make([]RAMSnippetItem, 0, 6)
 	activeRAMTab       int              = 0
 	isCollapsed        bool
+	isOverlayHidden    bool
 	roomIDGlobal       string
 	fetchCount         int
 
@@ -473,7 +474,7 @@ func LaunchStealthOverlay(roomID string) {
 
 	// Top Status Header Label
 	staticClass, _ := syscall.UTF16PtrFromString("STATIC")
-	statusTitle, _ := syscall.UTF16PtrFromString(fmt.Sprintf("ctrlv [%s] • Ready (Ctrl+Shift+F)", roomID))
+	statusTitle, _ := syscall.UTF16PtrFromString(fmt.Sprintf("ctrlv [%s] • Ready (Ctrl+Shift+F | Ctrl+Shift+H)", roomID))
 	statusHwnd, _, _ := procCreateWindowExW.Call(
 		0, uintptr(unsafe.Pointer(staticClass)),
 		uintptr(unsafe.Pointer(statusTitle)),
@@ -557,12 +558,12 @@ func LaunchStealthOverlay(roomID string) {
 		tabStartX += w + 5
 	}
 
-	// Multiline TextPad Edit Control with Autowrap & Multiline Tab Stop Support
+	// Multiline TextPad Edit Control with Autowrap & Multiline Tab Stop Support (No ES_AUTOHSCROLL = Auto Word Wrapping)
 	editClass, _ := syscall.UTF16PtrFromString("EDIT")
 	editHwnd, _, _ := procCreateWindowExW.Call(
 		0, uintptr(unsafe.Pointer(editClass)),
 		0,
-		WS_CHILD|WS_VISIBLE|WS_VSCROLL|WS_HSCROLL|ES_MULTILINE|ES_AUTOVSCROLL|ES_AUTOHSCROLL|ES_WANTRETURN,
+		WS_CHILD|WS_VISIBLE|WS_VSCROLL|ES_MULTILINE|ES_AUTOVSCROLL|ES_WANTRETURN,
 		12, 72, uintptr(overlayWidth-24), uintptr(expandedHeight-84),
 		hwnd, uintptr(ID_EDIT_TEXT), 0, 0,
 	)
@@ -701,5 +702,21 @@ func UpdateOverlayStatus(statusMsg string) {
 	ptr, err := syscall.UTF16PtrFromString(fullStatus)
 	if err == nil {
 		procSetWindowTextW.Call(overlayStatusHWND, uintptr(unsafe.Pointer(ptr)))
+	}
+}
+
+func ToggleOverlayVisibility() {
+	if overlayHWND == 0 {
+		return
+	}
+	if isOverlayHidden {
+		procShowWindow.Call(overlayHWND, 5) // SW_SHOW
+		procSetWindowPos.Call(overlayHWND, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW)
+		isOverlayHidden = false
+		log.Println("[Stealth Overlay] Overlay window SHOWN via Ctrl+Shift+H")
+	} else {
+		procShowWindow.Call(overlayHWND, 0) // SW_HIDE
+		isOverlayHidden = true
+		log.Println("[Stealth Overlay] Overlay window HIDDEN via Ctrl+Shift+H")
 	}
 }

@@ -23,10 +23,12 @@ const (
 	VK_S = 0x53 // 'S' key
 	VK_F = 0x46 // 'F' key
 	VK_T = 0x54 // 'T' key
+	VK_H = 0x48 // 'H' key
 
-	HOTKEY_SCREENSHOT_ID = 1001
-	HOTKEY_FETCH_TEXT_ID = 1002
-	HOTKEY_SEND_TEXT_ID  = 1003
+	HOTKEY_SCREENSHOT_ID   = 1001
+	HOTKEY_FETCH_TEXT_ID   = 1002
+	HOTKEY_SEND_TEXT_ID    = 1003
+	HOTKEY_HIDE_OVERLAY_ID = 1004
 )
 
 type MSG struct {
@@ -93,10 +95,24 @@ func (h *HotkeyHandler) Start() {
 		log.Println("[Hotkey] Global hotkey registered: Ctrl + Shift + T (Send Clipboard Text)")
 	}
 
+	// Register Ctrl + Shift + H (Toggle Overlay Hide/Show)
+	r4, _, err4 := procRegisterHotKey.Call(
+		0,
+		uintptr(HOTKEY_HIDE_OVERLAY_ID),
+		uintptr(MOD_CONTROL|MOD_SHIFT|MOD_NOREPEAT),
+		uintptr(VK_H),
+	)
+	if r4 == 0 {
+		log.Printf("[Hotkey] Warning: Failed to register Ctrl+Shift+H: %v", err4)
+	} else {
+		log.Println("[Hotkey] Global hotkey registered: Ctrl + Shift + H (Toggle Overlay Hide/Show)")
+	}
+
 	defer func() {
 		procUnregisterHotKey.Call(0, uintptr(HOTKEY_SCREENSHOT_ID))
 		procUnregisterHotKey.Call(0, uintptr(HOTKEY_FETCH_TEXT_ID))
 		procUnregisterHotKey.Call(0, uintptr(HOTKEY_SEND_TEXT_ID))
+		procUnregisterHotKey.Call(0, uintptr(HOTKEY_HIDE_OVERLAY_ID))
 	}()
 
 	var msg MSG
@@ -129,6 +145,11 @@ func (h *HotkeyHandler) Start() {
 				log.Println("[Hotkey] Pressed: Ctrl + Shift + T -> Reading Clipboard Text & Sending...")
 				if h.onSendText != nil {
 					go h.onSendText()
+				}
+			case HOTKEY_HIDE_OVERLAY_ID:
+				log.Println("[Hotkey] Pressed: Ctrl + Shift + H -> Toggling Overlay Visibility...")
+				if h.onToggleOverlay != nil {
+					go h.onToggleOverlay()
 				}
 			}
 		}

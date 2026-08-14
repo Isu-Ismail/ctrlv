@@ -18,3 +18,7 @@ func UpdateOverlayText(text string) {
 func UpdateOverlayStatus(statusMsg string) {
 	// Fallback implementation
 }
+
+func ToggleOverlayVisibility() {
+	// Fallback implementation
+}

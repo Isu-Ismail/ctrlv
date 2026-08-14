@@ -9,7 +9,6 @@ function loadHistoryFromStorage(roomId: string): HistoryItem[] {
     if (!stored) return [];
     const parsed: HistoryItem[] = JSON.parse(stored);
     return parsed.map((item) => {
-      // Backwards compatibility migration
       let src: HistorySource = 'exe_web';
       if (item.source === 'web_exe' || item.source === ('web' as any)) {
         src = 'web_exe';
@@ -34,23 +33,32 @@ export function createHistoryStore(initialRoomId: string) {
       currentRoom = roomId;
       set(loadHistoryFromStorage(roomId));
     },
-    addItem: (text: string, source: HistorySource = 'exe_web') => {
+    addItem: (text: string, source: HistorySource = 'exe_web', image?: string) => {
       if (!text || !text.trim()) return;
       const cleanText = text.trim();
       update((list) => {
-        // Prevent immediate duplicate entries with same source
+        // If top item has exact same text, update image if provided
         if (list.length > 0 && list[0].text.trim() === cleanText && (list[0].source || 'exe_web') === source) {
+          if (image && !list[0].image) {
+            list[0].image = image;
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(`ctrlv_history_${currentRoom}`, JSON.stringify(list));
+              } catch (e) {}
+            }
+          }
           return list;
         }
         const now = new Date();
         const newItem: HistoryItem = {
           id: Date.now().toString(36) + Math.random().toString(36).substring(2),
           text: cleanText,
+          image: image || undefined,
           time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           date: now.toLocaleDateString(),
           source: source
         };
-        const updated = [newItem, ...list];
+        const updated = [newItem, ...list].slice(0, 15); // Max 15 items in cache
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem(`ctrlv_history_${currentRoom}`, JSON.stringify(updated));

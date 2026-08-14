@@ -12,9 +12,9 @@ import (
 )
 
 type AIConfig struct {
-	Provider     string `json:"provider"`      // "openrouter", "groq", "gemini"
+	Provider     string `json:"provider"`      // "openrouter", "groq", "google", "openai"
 	APIKey       string `json:"api_key"`       // API key string
-	Model        string `json:"model"`         // e.g. "openrouter/auto", "google/gemini-2.0-flash-exp:free", "gemini-2.0-flash"
+	Model        string `json:"model"`         // e.g. "openrouter/auto", "gemini-2.0-flash", "gpt-4o-mini", "llama-3.2-11b-vision-preview"
 	CustomPrompt string `json:"custom_prompt"` // Instructions for vision AI
 	MaxTokens    int    `json:"max_tokens"`    // Max output tokens limit
 	CodeOnly     bool   `json:"code_only"`     // Strip markdown code fences
@@ -43,6 +43,7 @@ func SaveAIConfig(cfg *AIConfig) error {
 	if err != nil {
 		appCfg = &AppConfig{}
 	}
+	appCfg.Provider = cfg.Provider
 	appCfg.APIKey = cfg.APIKey
 	if cfg.Model != "" {
 		appCfg.Model = cfg.Model
@@ -93,6 +94,35 @@ func TestAICredentials(cfg *AIConfig) error {
 		if resp.StatusCode != http.StatusOK {
 			b, _ := io.ReadAll(resp.Body)
 			return fmt.Errorf("OpenRouter auth failed (HTTP %d): %s", resp.StatusCode, string(b))
+		}
+
+	case "openai":
+		endpoint := "https://api.openai.com/v1/chat/completions"
+		model := cfg.Model
+		if model == "" {
+			model = "gpt-4o-mini"
+		}
+		reqBody := map[string]interface{}{
+			"model":      model,
+			"max_tokens": 50,
+			"messages": []map[string]string{
+				{"role": "user", "content": "ping"},
+			},
+		}
+		bodyBytes, _ := json.Marshal(reqBody)
+		req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(bodyBytes))
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("OpenAI test request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			b, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("OpenAI auth failed (HTTP %d): %s", resp.StatusCode, string(b))
 		}
 
 	case "groq":

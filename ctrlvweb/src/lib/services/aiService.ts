@@ -4,12 +4,15 @@ import { wsStore, setWebText, showErrorModal } from '../stores/wsStore';
 import { sendTextToPC, markAsSolved } from './wsService';
 import type { AIProvider } from '../types/ai';
 
+import { historyStore } from '../stores/historyStore';
+
 let isSolving = false;
 
 function resolveAIProvider(provider: AIProvider, apiKey: string): AIProvider {
   if (provider && provider !== 'auto') return provider;
   if (apiKey.startsWith('gsk_')) return 'groq';
   if (apiKey.startsWith('AIza')) return 'google';
+  if (apiKey.startsWith('sk-proj-') || (apiKey.startsWith('sk-') && !apiKey.startsWith('sk-or-'))) return 'openai';
   return 'openrouter';
 }
 
@@ -31,7 +34,7 @@ export async function solveImageWithAI(b64ImageData?: string | null, textPrompt?
 
   if (!aiConfig || !aiConfig.apiKey) {
     aiSolverStatusStore.set({ state: 'error', message: 'Configure AI Key in Config first!' });
-    showErrorModal('AI Key Missing', 'Please open the Config tab and enter your API Key (e.g. from OpenRouter, Groq, or Google AI Studio).');
+    showErrorModal('AI Key Missing', 'Please open the Config tab and enter your API Key (e.g. from OpenRouter, OpenAI, Groq, or Google AI Studio).');
     return;
   }
 
@@ -92,6 +95,40 @@ export async function solveImageWithAI(b64ImageData?: string | null, textPrompt?
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson?.error?.message || `OpenRouter Error ${res.status}`);
+      }
+
+      const resData = await res.json();
+      generatedText = resData?.choices?.[0]?.message?.content || '';
+
+    } else if (provider === 'openai') {
+      const model = aiConfig.model || 'gpt-4o-mini';
+      const content: any[] = [{ type: 'text', text: prompt }];
+
+      if (questionText) {
+        content.push({ type: 'text', text: `Context / Question Text: ${questionText}` });
+      }
+      if (imageToSolve) {
+        let url = imageToSolve;
+        if (!url.startsWith('data:')) url = 'data:image/jpeg;base64,' + url;
+        content.push({ type: 'image_url', image_url: { url } });
+      }
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: aiConfig.maxTokens || 2048,
+          messages: [{ role: 'user', content }]
+        })
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || `OpenAI Error ${res.status}`);
       }
 
       const resData = await res.json();
@@ -171,6 +208,7 @@ export async function solveImageWithAI(b64ImageData?: string | null, textPrompt?
 
     if (generatedText) {
       setWebText(generatedText, wsState.roomId);
+      historyStore.addItem(generatedText, 'web_exe', imageToSolve || undefined);
       if (wsState.autoPush) {
         sendTextToPC(generatedText);
         aiSolverStatusStore.set({ state: 'success', message: 'Solved & Pushed to PC!' });

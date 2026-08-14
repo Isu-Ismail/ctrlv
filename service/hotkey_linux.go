@@ -23,7 +23,7 @@ func (h *HotkeyHandler) Start() {
 	screen := setup.DefaultScreen(X)
 	root := screen.Root
 
-	// Resolve keycodes for 'S', 'F', and 'T' dynamically
+	// Resolve keycodes for 'S', 'F', 'T', and 'H' dynamically
 	minKC := setup.MinKeycode
 	maxKC := setup.MaxKeycode
 	mapping, err := xproto.GetKeyboardMapping(X, minKC, byte(maxKC-minKC+1)).Reply()
@@ -33,7 +33,7 @@ func (h *HotkeyHandler) Start() {
 		return
 	}
 
-	var keycodeS, keycodeF, keycodeT xproto.Keycode
+	var keycodeS, keycodeF, keycodeT, keycodeH xproto.Keycode
 	keysymsPerKeycode := int(mapping.KeysymsPerKeycode)
 
 	for i := 0; i < int(maxKC-minKC+1); i++ {
@@ -49,10 +49,13 @@ func (h *HotkeyHandler) Start() {
 			if (sym == 0x0074 || sym == 0x0054) && keycodeT == 0 { // 't' or 'T'
 				keycodeT = kc
 			}
+			if (sym == 0x0068 || sym == 0x0048) && keycodeH == 0 { // 'h' or 'H'
+				keycodeH = kc
+			}
 		}
 	}
 
-	// Fallback keycodes if resolution failed (standard US QWERTY: S=39, F=41, T=28)
+	// Fallback keycodes if resolution failed (standard US QWERTY: S=39, F=41, T=28, H=43)
 	if keycodeS == 0 {
 		keycodeS = 39
 	}
@@ -61,6 +64,9 @@ func (h *HotkeyHandler) Start() {
 	}
 	if keycodeT == 0 {
 		keycodeT = 28
+	}
+	if keycodeH == 0 {
+		keycodeH = 43
 	}
 
 	// Modifiers: Ctrl + Alt (ModMaskControl | ModMask1)
@@ -87,7 +93,12 @@ func (h *HotkeyHandler) Start() {
 		_ = xproto.GrabKey(X, true, root, m, keycodeT, xproto.GrabModeAsync, xproto.GrabModeAsync)
 	}
 
-	log.Printf("[Hotkey] Linux X11 global hotkeys registered: Ctrl+Alt+S (Screenshot) | Ctrl+Alt+F (Fetch) | Ctrl+Alt+T (Send Clipboard Text)")
+	// Grab Ctrl + Alt + H
+	for _, m := range modMasks {
+		_ = xproto.GrabKey(X, true, root, m, keycodeH, xproto.GrabModeAsync, xproto.GrabModeAsync)
+	}
+
+	log.Printf("[Hotkey] Linux X11 global hotkeys registered: Ctrl+Alt+S (Screenshot) | Ctrl+Alt+F (Fetch) | Ctrl+Alt+T (Send Clipboard) | Ctrl+Alt+H (Toggle Overlay)")
 
 	// Event loop
 	errChan := make(chan error, 1)
@@ -118,6 +129,11 @@ func (h *HotkeyHandler) Start() {
 					log.Println("[Hotkey] Global hotkey triggered: Ctrl + Alt + T (Send Clipboard Text)")
 					if h.onSendText != nil {
 						go h.onSendText()
+					}
+				case keycodeH:
+					log.Println("[Hotkey] Global hotkey triggered: Ctrl + Alt + H (Toggle Overlay)")
+					if h.onToggleOverlay != nil {
+						go h.onToggleOverlay()
 					}
 				}
 			}
